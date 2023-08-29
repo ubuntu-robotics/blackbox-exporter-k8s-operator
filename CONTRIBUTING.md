@@ -83,7 +83,7 @@ juju deploy ./blackbox-exporter-k8s.charm \
 
 
 ## Design choices
-- The `blackbox-exporter.yaml` config file is created in its entirety by the charm
+- The `config.yaml` config file is created in its entirety by the charm
   code on startup. This is done to maintain consistency across OCI images.
 
 [gh:Prometheus operator]: https://github.com/canonical/prometheus-k8s-operator

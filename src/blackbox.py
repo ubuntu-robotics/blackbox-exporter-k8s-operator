@@ -37,7 +37,7 @@ class WorkloadManager(Object):
     """Workload manager for blackbox exporter."""
 
     _layer_name = _service_name = "blackbox-exporter"
-    _exe_name = "prometheus-blackbox-exporter"  # TODO: check if this is true
+    _exe_name = "blackbox_exporter"
 
     def __init__(
         self,
@@ -153,7 +153,8 @@ class WorkloadManager(Object):
             raise ContainerNotReady("cannot update config")
         logger.debug("applying config changes")
         config = self.model.config.get("config_file")
-        self._container.push(self._config_path, config, make_dirs=True)
+        if config:
+            self._container.push(self._config_path, config, make_dirs=True)
 
     def restart_service(self) -> bool:
         """Helper function for restarting the underlying service.

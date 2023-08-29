@@ -34,12 +34,11 @@ class BlackboxExporterCharm(CharmBase):
 
     # Container name must match metadata.yaml
     # Service name matches charm name for consistency
-    _container_name = _service_name = "blackbox-exporter"
-    _relations = SimpleNamespace()  # TODO: is this needed?
+    _container_name = _service_name = "blackbox"
     _port = 9115
 
     # path, inside the workload container, to the blackbox exporter configuration files
-    _config_path = "/etc/blackbox-exporter/blackbox-exporter.yaml"
+    _config_path = "/etc/blackbox_exporter/config.yml"
 
     def __init__(self, *args):
         super().__init__(*args)
@@ -60,7 +59,7 @@ class BlackboxExporterCharm(CharmBase):
             # The workload manager too observes pebble ready, but still need this here because
             # of the common exit hook (otherwise would need to pass the common exit hook as
             # a callback).
-            self.on.blackbox_exporter_pebble_ready,  # pyright: ignore
+            self.on.blackbox_pebble_ready,  # pyright: ignore
             self._on_pebble_ready,
         )
         self.framework.observe(self.on.update_status, self._on_update_status)
