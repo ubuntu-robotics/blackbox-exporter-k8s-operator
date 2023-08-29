@@ -1,0 +1,80 @@
+# Blackbox Exporter Operator (k8s)
+[![Charmhub Badge](https://charmhub.io/blackbox-exporter-k8s/badge.svg)](https://charmhub.io/blackbox-exporter-k8s)
+[![Release](https://github.com/canonical/blackbox-exporter-k8s-operator/actions/workflows/release.yaml/badge.svg)](https://github.com/canonical/blackbox-exporter-k8s-operator/actions/workflows/release.yaml)
+[![Discourse Status](https://img.shields.io/discourse/status?server=https%3A%2F%2Fdiscourse.charmhub.io&style=flat&label=CharmHub%20Discourse)](https://discourse.charmhub.io)
+
+[Charmed Blackbox Exporter (blackbox-exporter-k8s)][Blackbox Exporter operator] is a charm for
+[Alertmanager].
+
+The charm imposes configurable resource limits on the workload, can be readily
+integrated with [prometheus][Prometheus operator], [grafana][Grafana operator]
+and [loki][Loki operator], and it comes with built-in alert rules and dashboards for
+self-monitoring.
+
+[Blackbox Exporter]: https://github.com/prometheus/blackbox_exporter
+[Grafana operator]: https://charmhub.io/grafana-k8s
+[Loki operator]: https://charmhub.io/loki-k8s
+[Prometheus operator]: https://charmhub.io/prometheus-k8s
+[Blackbox Exporter operator]: https://charmhub.io/blackbox-exporter-k8s
+
+
+## Getting started
+
+### Basic deployment
+
+Once you have a controller and model ready, you can deploy the blackbox exporter
+using the Juju CLI:
+
+```shell
+juju deploy --channel=beta blackbox-exporter-k8s
+```
+
+The available [channels](https://snapcraft.io/docs/channels) are listed at the top
+of [the page](https://charmhub.io/blackbox-exporter-k8s) and can also be retrieved with
+Charmcraft CLI:
+
+```shell
+$ charmcraft status blackbox-exporter-k8s
+
+Track    Base                  Channel    Version    Revision    Resources
+latest   ubuntu 22.04 (amd64)  stable     -          -           -
+                               candidate  -          -           -
+                               beta       1          1           blackbox-exporter-image (r1)
+                               edge       1          1           blackbox-exporter-image (r1)
+```
+
+Once the Charmed Operator is deployed, the status can be checked by running:
+
+```shell
+juju status --relations --storage --color
+```
+
+
+### Configuration
+
+In order to configure the Blackbox Exporter, a [configuration file](https://github.com/prometheus/blackbox_exporter/blob/master/CONFIGURATION.md)
+must be provided using the
+[`config_file`](https://charmhub.io/blackbox-exporter-k8s/conigure#config_file) option:
+
+```shell
+juju config blackbox-exporter-k8s \
+  config_file='@path/to/blackbox-exporter.yaml'
+```
+
+
+To verify Blackbox Exporter is using the expected configuration you can use the
+[`show-config`](https://charmhub.io/blackbox-exporter-k8s/actions#show-config) action:
+
+```shell
+juju run-action blackbox-exporter-k8s/0 show-config --wait
+```
+
+
+## OCI Images
+This charm is published on Charmhub with alertmanager images from
+the official [quay.io/prometheus/blackbox-exporter].
+
+[quay.io/prometheus/blackbox-exporter]: https://quay.io/repository/prometheus/blackbox-exporter?tab=tags
+
+## Additional Information
+- [Blackbox Exporter README](https://github.com/prometheus/blackbox-exporter)
