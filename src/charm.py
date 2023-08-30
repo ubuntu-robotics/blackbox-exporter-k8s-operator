@@ -6,10 +6,9 @@
 
 import logging
 import socket
-from types import SimpleNamespace
 from urllib.parse import urlparse
 
-from blackbox import WorkloadManager
+from blackbox import ConfigUpdateFailure, WorkloadManager
 from charms.observability_libs.v0.kubernetes_compute_resources_patch import (
     K8sResourcePatchFailedEvent,
     KubernetesComputeResourcesPatch,
@@ -136,7 +135,11 @@ class BlackboxExporterCharm(CharmBase):
                 return
 
         # Update config file
-        self.blackbox_workload.update_config()
+        try:
+            self.blackbox_workload.update_config()
+        except ConfigUpdateFailure as e:
+            self.unit.status = BlockedStatus(str(e))
+            return
 
         # Update pebble layer
         self.blackbox_workload.update_layer()

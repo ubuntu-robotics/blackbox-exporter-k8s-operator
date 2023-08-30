@@ -12,6 +12,7 @@ import urllib.parse
 import urllib.request
 from typing import Optional
 
+import yaml
 from ops.framework import Object
 from ops.pebble import (  # type: ignore
     ChangeError,
@@ -153,7 +154,15 @@ class WorkloadManager(Object):
             raise ContainerNotReady("cannot update config")
         logger.debug("applying config changes")
         config = self.model.config.get("config_file")
+        # Basic config validation: valid yaml
         if config:
+            try:
+                yaml.safe_load(config)
+            except yaml.YAMLError as e:
+                logger.error(
+                    "Failed to load the configuration; invalid YAML: %s %s", config, str(e)
+                )
+                raise ConfigUpdateFailure("Failed to load config; invalid YAML")
             self._container.push(self._config_path, config, make_dirs=True)
 
     def restart_service(self) -> bool:
