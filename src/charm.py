@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 import yaml
 from blackbox import ConfigUpdateFailure, WorkloadManager
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
+from charms.loki_k8s.v0.loki_push_api import LokiPushApiConsumer
 from charms.observability_libs.v0.kubernetes_compute_resources_patch import (
     K8sResourcePatchFailedEvent,
     KubernetesComputeResourcesPatch,
@@ -84,7 +85,7 @@ class BlackboxExporterCharm(CharmBase):
             self._on_k8s_patch_failed,
         )
 
-        # - Self monitoring
+        # - Self monitoring and probes
         self._scraping = MetricsEndpointProvider(
             self,
             relation_name="self-metrics-endpoint",
@@ -94,7 +95,8 @@ class BlackboxExporterCharm(CharmBase):
                 self.on.update_status,
             ],
         )
-        self.grafana_dashboard_provider = GrafanaDashboardProvider(charm=self)
+        self._grafana_dashboard_provider = GrafanaDashboardProvider(charm=self)
+        self._loki_consumer = LokiPushApiConsumer(self)
 
     def _resource_reqs_from_config(self) -> ResourceRequirements:
         """Get the resources requirements from the Juju config."""
