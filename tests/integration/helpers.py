@@ -3,13 +3,9 @@
 
 """Helper functions for writing tests."""
 
-import asyncio
-import grp
-import json
 import logging
 import urllib.request
-from typing import Dict, Optional, Tuple
-from urllib.parse import urlparse
+from typing import Optional, Tuple
 
 from pytest_operator.plugin import OpsTest
 
