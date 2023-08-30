@@ -37,13 +37,21 @@ async def is_blackbox_up(ops_test: OpsTest, app_name: str):
     )
 
 
-async def can_blackbox_probe(ops_test: OpsTest, app_name: str, unit_num: int, target: Optional[str] = None, module: str = "http_2xx"):
+async def can_blackbox_probe(
+    ops_test: OpsTest,
+    app_name: str,
+    unit_num: int,
+    target: Optional[str] = None,
+    module: str = "http_2xx",
+):
     address = await get_unit_address(ops_test, app_name, unit_num)
     url = f"http://{address}:9115"
     if not target:
         target = f"{address}:9115"
-    
-    response = urllib.request.urlopen(f"{url}/probe?target={target}&module={module}", data=None, timeout=2.0)
+
+    response = urllib.request.urlopen(
+        f"{url}/probe?target={target}&module={module}", data=None, timeout=2.0
+    )
     return response.code == 200 and "probe_success 1" in json.loads(response.read())
 
 

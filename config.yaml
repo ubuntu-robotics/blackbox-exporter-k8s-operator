@@ -9,6 +9,13 @@ options:
       Blackbox Exporter configuration file (yaml).
       Refer to https://github.com/prometheus/blackbox_exporter/blob/master/CONFIGURATION.md for
       full details.
+  probes_file:
+    type: string
+    default: ""
+    description: >
+      Scrape config for Prometheus in a file (yaml).
+      Refer to https://github.com/prometheus/blackbox_exporter#prometheus-configuration for full
+      details.
   web_external_url:
     type: string
     default: ""

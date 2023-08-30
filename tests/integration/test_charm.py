@@ -42,6 +42,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_under_test):
     assert ops_test.model.applications[app_name].units[0].workload_status == "active"
     assert await is_blackbox_up(ops_test, app_name)
 
+
 @pytest.mark.abort_on_fail
 async def test_probe_endpoint(ops_test: OpsTest):
     assert await can_blackbox_probe(ops_test, app_name, 0)

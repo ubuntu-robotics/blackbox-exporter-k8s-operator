@@ -8,7 +8,9 @@ import logging
 import socket
 from urllib.parse import urlparse
 
+import yaml
 from blackbox import ConfigUpdateFailure, WorkloadManager
+from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.observability_libs.v0.kubernetes_compute_resources_patch import (
     K8sResourcePatchFailedEvent,
     KubernetesComputeResourcesPatch,
@@ -86,11 +88,13 @@ class BlackboxExporterCharm(CharmBase):
         self._scraping = MetricsEndpointProvider(
             self,
             relation_name="self-metrics-endpoint",
-            jobs=self.self_scraping_job,
+            jobs=self.self_scraping_job + self.probes_scraping_jobs,
             refresh_event=[
+                self.on.config_changed,
                 self.on.update_status,
             ],
         )
+        self.grafana_dashboard_provider = GrafanaDashboardProvider(charm=self)
 
     def _resource_reqs_from_config(self) -> ResourceRequirements:
         """Get the resources requirements from the Juju config."""
@@ -187,6 +191,27 @@ class BlackboxExporterCharm(CharmBase):
         }
 
         return [job]
+
+    @property
+    def probes_scraping_jobs(self):
+        """The scraping jobs to execute probes from Prometheus."""
+        jobs = []
+        external_url = urlparse(self._external_url)
+        f"{external_url.path.rstrip('/')}/probe"
+        probes_scrape_jobs = self.model.config.get("probes_file")
+        if probes_scrape_jobs:
+            probes = yaml.safe_load(probes_scrape_jobs)
+            # Add the Blackbox Exporter's `relabel_configs` to each job
+            for probe in probes["scrape_configs"]:
+                probe["relabel_configs"] = [
+                    {"source_labels": ["__address__"], "target_label": "__param_target"},
+                    {"source_labels": ["__param_target"], "target_label": "instance"},
+                    {"source_labels": ["__param_target"], "target_label": "probe_target"},
+                    {"target_label": "__address__", "replacement": self._external_url.replace("http://","")},
+                ]
+                jobs.append(probe)
+
+        return jobs
 
     def _on_pebble_ready(self, _):
         """Event handler for PebbleReadyEvent."""
