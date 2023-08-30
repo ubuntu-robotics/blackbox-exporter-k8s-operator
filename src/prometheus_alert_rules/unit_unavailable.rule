@@ -1,0 +1,24 @@
+groups:
+  - name: blackbox-exporter-self-monitoring
+    rules:
+    - alert: BlackboxExporterUnitIsUnavailable
+      expr: up{} < 1
+      for: 0m
+      labels:
+        severity: critical
+      annotations:
+        summary: Blackbox Exporter unit {{ $labels.juju_model }}/{{ $labels.juju_unit }} unavailable
+        description: >
+          The Blackbox Exporter unit {{ $labels.juju_model }} {{ $labels.juju_unit }} is unavailable
+          LABELS = {{ $labels }}
+
+    - alert: BlackboxExporterUnitIsDown
+      expr: avg_over_time(up{}[1m]) < 0.5
+      for: 0m
+      labels:
+        severity: critical
+      annotations:
+        summary: Blackbox Exporter unit {{ $labels.juju_model }}/{{ $labels.juju_unit }} has been unreachable at least 50% of the time over the last minute
+        description: >
+          The Blackbox Exporter unit {{ $labels.juju_model }} {{ $labels.juju_unit }} has been unreachable at least 50% of the time over the last minute
+          LABELS = {{ $labels }}

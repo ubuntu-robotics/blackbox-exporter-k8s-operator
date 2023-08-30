@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 import yaml
-from helpers import is_blackbox_up
+from helpers import can_blackbox_probe, is_blackbox_up
 from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
@@ -41,3 +41,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_under_test):
     await ops_test.model.wait_for_idle(apps=[app_name], status="active", timeout=1000)
     assert ops_test.model.applications[app_name].units[0].workload_status == "active"
     assert await is_blackbox_up(ops_test, app_name)
+
+@pytest.mark.abort_on_fail
+async def test_probe_endpoint(ops_test: OpsTest):
+    assert await can_blackbox_probe(ops_test, app_name, 0)

@@ -15,6 +15,7 @@ from charms.observability_libs.v0.kubernetes_compute_resources_patch import (
     ResourceRequirements,
     adjust_resource_requirements,
 )
+from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from ops.charm import ActionEvent, CharmBase
 from ops.main import main
 from ops.model import (
@@ -79,6 +80,16 @@ class BlackboxExporterCharm(CharmBase):
         self.framework.observe(
             self.resources_patch.on.patch_failed,  # pyright: ignore
             self._on_k8s_patch_failed,
+        )
+
+        # - Self monitoring
+        self._scraping = MetricsEndpointProvider(
+            self,
+            relation_name="self-metrics-endpoint",
+            jobs=self.self_scraping_job,
+            refresh_event=[
+                self.on.update_status,
+            ],
         )
 
     def _resource_reqs_from_config(self) -> ResourceRequirements:
@@ -161,6 +172,21 @@ class BlackboxExporterCharm(CharmBase):
         If not set in the config, return the internal url.
         """
         return self.model.config.get("web-external-url") or self._internal_url
+
+    @property
+    def self_scraping_job(self):
+        """The self-monitoring scrape job."""
+        external_url = urlparse(self._external_url)
+        metrics_path = f"{external_url.path.rstrip('/')}/metrics"
+        target = (
+            f"{external_url.hostname}{':'+str(external_url.port) if external_url.port else ''}"
+        )
+        job = {
+            "metrics_path": metrics_path,
+            "static_configs": [{"targets": [target]}],
+        }
+
+        return [job]
 
     def _on_pebble_ready(self, _):
         """Event handler for PebbleReadyEvent."""

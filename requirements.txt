@@ -29,3 +29,5 @@ lightkube-models
 # Cryptography
 # Deps: tls_certificates
 cryptography
+
+cosl

@@ -21,12 +21,6 @@ docs: https://discourse.charmhub.io/t/blackbox-exporter-k8s-docs-index/ # TODO: 
 containers:
   blackbox:  # container key used by pebble
     resource: blackbox-exporter-image
-    mounts:
-      - storage: data
-        # nflogs and silences files go here. With a mounted storage for silences, they persist
-        # across container restarts.
-        # This path is passed to alertmanager via the `--storage.path` cli argument.
-        location: /blackbox-exporter
 
 # oci-image resources for each container defined above
 resources:
