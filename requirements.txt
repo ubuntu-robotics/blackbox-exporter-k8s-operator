@@ -11,7 +11,7 @@ jsonschema
 # Code: https://github.com/canonical/operator/
 # Docs: https://ops.rtfd.io/
 # Deps: charm
-ops < 2.5.0  # https://github.com/canonical/ops-scenario/issues/48
+ops  # https://github.com/canonical/ops-scenario/issues/48
 
 # YAML processing framework
 # Code: https://github.com/yaml/pyyaml
@@ -25,9 +25,5 @@ PyYAML
 # Deps: observability_libs
 lightkube >= 0.11
 lightkube-models
-
-# Cryptography
-# Deps: tls_certificates
-cryptography
 
 cosl

@@ -90,7 +90,7 @@ juju deploy ./blackbox-exporter-k8s.charm \
 [Prometheus operator]: https://charmhub.io/prometheus-k8s
 [COS Lite]: https://charmhub.io/cos-lite
 [Mattermost channel]: https://chat.charmhub.io/charmhub/channels/observability
-[Discourse]: https://discourse.charmhub.io/tag/alertmanager
+[Discourse]: https://discourse.charmhub.io/tag/blackbox-exporter
 [test harness]: https://ops.readthedocs.io/en/latest/#module-ops.testing
 [pytest-operator]: https://github.com/charmed-kubernetes/pytest-operator/blob/main/docs/reference.md
 [python-libjuju]: https://pythonlibjuju.readthedocs.io/en/latest/

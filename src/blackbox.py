@@ -247,7 +247,7 @@ class BlackboxExporterApi:
             timeout: duration in seconds after which to return, regardless the result
 
         Raises:
-            AlertmanagerBadResponse: If no response or invalid response, regardless the reason.
+            BlackboxExporterBadResponse: If no response or invalid response, regardless the reason.
         """
         for retry in reversed(range(3)):
             try:

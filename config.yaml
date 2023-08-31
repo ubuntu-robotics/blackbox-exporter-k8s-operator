@@ -16,29 +16,6 @@ options:
       Scrape config for Prometheus in a file (yaml).
       Refer to https://github.com/prometheus/blackbox_exporter#prometheus-configuration for full
       details.
-  web_external_url:
-    type: string
-    default: ""
-    description: |
-      DEPRECATED. This config option is no longer used, in favor of "skipPrefix".
-
-      The URL under which Blackbox Exporter is externally reachable (for example, if
-      Alertmanager is served via a manually configured ingress).
-
-      This config option is used for the `--web.external-url` Blackbox Exporter cli
-      argument. If this charm config option is provided, it takes precedence over the
-      URL provided over the "ingress" relation.
-
-      Note: this config option shouldn't be included when you're using the "ingress"
-      relation (e.g. traefik) - the charm will automatically assign an external url
-      to `--web.external-url` when related to an ingress provider.
-
-      This should be a complete URI, including scheme, or a  fully qualified subpath
-      starting with `/`.
-      If Blackbox Exporter is being served directly from the root of a fully-qualified
-      host or a bare A record, this may be omitted.
-      If the URL has a path portion, Blackbox Exporter will use it to prefix all HTTP
-      endpoints.
   cpu:
     description: |
       K8s cpu resource limit, e.g. "1" or "500m". Default is unset (no limit). This value is used

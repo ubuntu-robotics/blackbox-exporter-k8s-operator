@@ -11,13 +11,13 @@ from urllib.parse import urlparse
 import yaml
 from blackbox import ConfigUpdateFailure, WorkloadManager
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
-from charms.loki_k8s.v0.loki_push_api import LokiPushApiConsumer
 from charms.observability_libs.v0.kubernetes_compute_resources_patch import (
     K8sResourcePatchFailedEvent,
     KubernetesComputeResourcesPatch,
     ResourceRequirements,
     adjust_resource_requirements,
 )
+from charms.catalogue_k8s.v0.catalogue import CatalogueConsumer, CatalogueItem
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from ops.charm import ActionEvent, CharmBase
 from ops.main import main
@@ -96,7 +96,23 @@ class BlackboxExporterCharm(CharmBase):
             ],
         )
         self._grafana_dashboard_provider = GrafanaDashboardProvider(charm=self)
-        self._loki_consumer = LokiPushApiConsumer(self)
+
+        self.catalog = CatalogueConsumer(
+            charm=self,
+            refresh_event=[
+                self.on.update_status,
+                self.on.config_changed,  # also covers upgrade-charm
+            ],
+            item=CatalogueItem(
+                name="Blackbox Exporter",
+                icon="box",
+                url=self._external_url,
+                description=(
+                    "Blackbox exporter allows blackbox probing of endpoints over a multitude of "
+                    "protocols, including HTTP, HTTPS, DNS, TCP, ICMP and gRPC."
+                ),
+            ),
+        )
 
     def _resource_reqs_from_config(self) -> ResourceRequirements:
         """Get the resources requirements from the Juju config."""
@@ -177,7 +193,10 @@ class BlackboxExporterCharm(CharmBase):
 
         If not set in the config, return the internal url.
         """
-        return self.model.config.get("web-external-url") or self._internal_url
+        # Note: this property is here for convenience, and for semantic reasons.
+        # When the charm will have a traefik relation, the `_external_url` should
+        # return `self.ingress.url or self._internal_url`.
+        return self._internal_url
 
     @property
     def self_scraping_job(self):
@@ -205,10 +224,14 @@ class BlackboxExporterCharm(CharmBase):
             probes = yaml.safe_load(probes_scrape_jobs)
             # Add the Blackbox Exporter's `relabel_configs` to each job
             for probe in probes["scrape_configs"]:
+                # The relabel configs come from the official Blackbox Exporter docs; please refer
+                # to that for further information on what they do
                 probe["relabel_configs"] = [
                     {"source_labels": ["__address__"], "target_label": "__param_target"},
                     {"source_labels": ["__param_target"], "target_label": "instance"},
+                    # Copy the scrape job target to an extra label for dahsboard usage
                     {"source_labels": ["__param_target"], "target_label": "probe_target"},
+                    # Set the address to scrape to the blackbox exporter url
                     {
                         "target_label": "__address__",
                         "replacement": self._external_url.replace("http://", ""),

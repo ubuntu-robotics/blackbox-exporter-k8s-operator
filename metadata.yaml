@@ -15,7 +15,7 @@ description: |
 website: https://charmhub.io/blackbox-exporter-k8s
 source: https://github.com/canonical/blackbox-exporter-k8s-operator
 issues: https://github.com/canonical/blackbox-exporter-k8s-operator/issues
-docs: https://discourse.charmhub.io/t/blackbox-exporter-k8s-docs-index/ # TODO: add correct docs link
+docs: https://discourse.charmhub.io/t/blackbox-exporter-k8s-docs-index/11728
 
 # workload containers
 containers:
@@ -42,7 +42,3 @@ requires:
       Receives Loki's push api endpoint address to push logs to, and forwards charm's built-in alert rules to Loki.
   catalogue:
     interface: catalogue
-
-storage:
-  data:
-    type: filesystem

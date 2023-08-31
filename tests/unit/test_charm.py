@@ -28,8 +28,6 @@ class TestWithInitialHooks(unittest.TestCase):
         self.harness = Harness(BlackboxExporterCharm)
         self.addCleanup(self.harness.cleanup)
 
-        # self.relation_id = self.harness.add_relation("alerting", "otherapp")
-        # self.harness.add_relation_unit(self.relation_id, "otherapp/0")
         self.harness.set_leader(True)
 
         self.harness.begin_with_initial_hooks()
@@ -77,12 +75,9 @@ class TestWithoutInitialHooks(unittest.TestCase):
         self.harness = Harness(BlackboxExporterCharm)
         self.addCleanup(self.harness.cleanup)
 
-        # self.relation_id = self.harness.add_relation("alerting", "otherapp")
-        # self.harness.add_relation_unit(self.relation_id, "otherapp/0")
         self.harness.set_leader(True)
 
         self.harness.begin()
-        # self.harness.add_relation("replicas", "alertmanager")
 
     @k8s_resource_multipatch
     @patch.object(WorkloadManager, "_blackbox_exporter_version", property(lambda *_: "0.0.0"))

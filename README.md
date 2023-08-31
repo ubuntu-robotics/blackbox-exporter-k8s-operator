@@ -4,7 +4,7 @@
 [![Discourse Status](https://img.shields.io/discourse/status?server=https%3A%2F%2Fdiscourse.charmhub.io&style=flat&label=CharmHub%20Discourse)](https://discourse.charmhub.io)
 
 [Charmed Blackbox Exporter (blackbox-exporter-k8s)][Blackbox Exporter operator] is a charm for
-[Alertmanager].
+[Blackbox Exporter].
 
 The charm imposes configurable resource limits on the workload, can be readily
 integrated with [prometheus][Prometheus operator], [grafana][Grafana operator]
@@ -71,7 +71,7 @@ juju run-action blackbox-exporter-k8s/0 show-config --wait
 
 
 ## OCI Images
-This charm is published on Charmhub with alertmanager images from
+This charm is published on Charmhub with blackbox exporter images from
 the official [quay.io/prometheus/blackbox-exporter].
 
 [quay.io/prometheus/blackbox-exporter]: https://quay.io/repository/prometheus/blackbox-exporter?tab=tags
