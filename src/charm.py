@@ -43,7 +43,7 @@ class BlackboxExporterCharm(CharmBase):
 
     # path, inside the workload container, to the blackbox exporter configuration files
     _config_path = "/etc/blackbox_exporter/config.yml"
-    _logs_path = "/var/log/blackbox.log"
+    _log_path = "/var/blackbox.log"
 
     def __init__(self, *args):
         super().__init__(*args)
@@ -57,7 +57,7 @@ class BlackboxExporterCharm(CharmBase):
             port=self._port,
             web_external_url=self._external_url,
             config_path=self._config_path,
-            logs_path=self._logs_path,
+            log_path=self._log_path,
         )
         self.framework.observe(self.on.config_changed, self._on_config_changed)
 
@@ -102,7 +102,7 @@ class BlackboxExporterCharm(CharmBase):
         self._log_proxy = LogProxyConsumer(
             charm=self,
             relation_name="logging",
-            log_files=[self._logs_path],
+            log_files=[self._log_path],
             container_name=self._container_name,
             enable_syslog=False,
         )

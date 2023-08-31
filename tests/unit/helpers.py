@@ -17,7 +17,7 @@ def tautology(*_, **__) -> bool:
 
 def cli_arg(plan, cli_opt):
     plan_dict = plan.to_dict()
-    args = plan_dict["services"]["blackbox-exporter"]["command"].split()
+    args = plan_dict["services"]["blackbox"]["command"].split()
     for arg in args:
         opt_list = arg.split("=")
         if len(opt_list) == 2 and opt_list[0] == cli_opt:
