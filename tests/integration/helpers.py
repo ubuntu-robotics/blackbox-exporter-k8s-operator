@@ -52,7 +52,7 @@ async def can_blackbox_probe(
     response = urllib.request.urlopen(
         f"{url}/probe?target={target}&module={module}", data=None, timeout=2.0
     )
-    return response.code == 200 and "probe_success 1" in json.loads(response.read())
+    return response.code == 200 and "probe_success 1" in str(response.read())
 
 
 async def get_blackbox_config_from_file(
