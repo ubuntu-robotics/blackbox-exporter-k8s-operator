@@ -111,7 +111,7 @@ class WorkloadManager(Object):
                 f"--config.file={self._config_path} "
                 f"--web.listen-address=:{self._port} "
                 f"--web.external-url={self._web_external_url} "
-                f"| tee >(split -d -b 100000 - {self._logs_path})"
+                f"| tee > {self._logs_path})"
             )
 
         return Layer(

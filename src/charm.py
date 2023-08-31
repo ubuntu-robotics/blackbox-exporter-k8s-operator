@@ -43,7 +43,7 @@ class BlackboxExporterCharm(CharmBase):
 
     # path, inside the workload container, to the blackbox exporter configuration files
     _config_path = "/etc/blackbox_exporter/config.yml"
-    _logs_path = "/var/log/blackbox_exporter/"
+    _logs_path = "/var/log/blackbox.log"
 
     def __init__(self, *args):
         super().__init__(*args)
