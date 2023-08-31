@@ -53,14 +53,13 @@ juju status --relations --storage --color
 ### Configuration
 
 In order to configure the Blackbox Exporter, a [configuration file](https://github.com/prometheus/blackbox_exporter/blob/master/CONFIGURATION.md)
-must be provided using the
+should be provided using the
 [`config_file`](https://charmhub.io/blackbox-exporter-k8s/conigure#config_file) option:
 
 ```shell
 juju config blackbox-exporter-k8s \
-  config_file='@path/to/blackbox-exporter.yaml'
+  config_file='@path/to/blackbox.yml'
 ```
-
 
 To verify Blackbox Exporter is using the expected configuration you can use the
 [`show-config`](https://charmhub.io/blackbox-exporter-k8s/actions#show-config) action:
@@ -69,6 +68,23 @@ To verify Blackbox Exporter is using the expected configuration you can use the
 juju run-action blackbox-exporter-k8s/0 show-config --wait
 ```
 
+To configure the actual probes, there first needs to be a Prometheus relation:
+
+```shell
+juju relate blackbox-exporter-k8s prometheus
+```
+
+Then, the probes configuration should be written to a file (following the 
+[Blackbox Exporter docs](https://github.com/prometheus/blackbox_exporter#prometheus-configuration)
+) and passed via `juju config`:
+
+```shell
+juju config blackbox-exporter-k8s \
+  probes_file='@path/to/probes.yml'
+```
+
+Note that the `relabel_configs` of each scrape job doesn't need to be specified, and will be 
+overridden by the charm with the needed labels and the correct Blackbox Exporter url.
 
 ## OCI Images
 This charm is published on Charmhub with blackbox exporter images from
