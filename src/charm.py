@@ -100,7 +100,11 @@ class BlackboxExporterCharm(CharmBase):
         )
         self._grafana_dashboard_provider = GrafanaDashboardProvider(charm=self)
         self._log_proxy = LogProxyConsumer(
-            charm=self, log_files=[self._logs_path], container_name=self._container_name
+            charm=self,
+            relation_name="logging",
+            log_files=[self._logs_path],
+            container_name=self._container_name,
+            enable_syslog=False,
         )
 
         self.catalog = CatalogueConsumer(
