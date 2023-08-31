@@ -12,6 +12,7 @@ import yaml
 from blackbox import ConfigUpdateFailure, WorkloadManager
 from charms.catalogue_k8s.v0.catalogue import CatalogueConsumer, CatalogueItem
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
+from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
 from charms.observability_libs.v0.kubernetes_compute_resources_patch import (
     K8sResourcePatchFailedEvent,
     KubernetesComputeResourcesPatch,
@@ -42,6 +43,7 @@ class BlackboxExporterCharm(CharmBase):
 
     # path, inside the workload container, to the blackbox exporter configuration files
     _config_path = "/etc/blackbox_exporter/config.yml"
+    _logs_path = "/var/log/blackbox_exporter/"
 
     def __init__(self, *args):
         super().__init__(*args)
@@ -55,6 +57,7 @@ class BlackboxExporterCharm(CharmBase):
             port=self._port,
             web_external_url=self._external_url,
             config_path=self._config_path,
+            logs_path=self._logs_path,
         )
         self.framework.observe(self.on.config_changed, self._on_config_changed)
 
@@ -96,6 +99,9 @@ class BlackboxExporterCharm(CharmBase):
             ],
         )
         self._grafana_dashboard_provider = GrafanaDashboardProvider(charm=self)
+        self._log_proxy = LogProxyConsumer(
+            charm=self, log_files=[self._logs_path], container_name=self._container_name
+        )
 
         self.catalog = CatalogueConsumer(
             charm=self,

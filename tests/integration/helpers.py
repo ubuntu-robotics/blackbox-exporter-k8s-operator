@@ -3,7 +3,6 @@
 
 """Helper functions for writing tests."""
 
-import json
 import logging
 import urllib.request
 from typing import Optional, Tuple

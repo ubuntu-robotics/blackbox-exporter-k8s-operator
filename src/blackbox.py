@@ -48,6 +48,7 @@ class WorkloadManager(Object):
         port: int,
         web_external_url: str,
         config_path: str,
+        logs_path: str,
     ):
         # Must inherit from ops 'Object' to be able to register events.
         super().__init__(charm, f"{self.__class__.__name__}-{container_name}")
@@ -62,6 +63,7 @@ class WorkloadManager(Object):
         self._port = port
         self._web_external_url = web_external_url
         self._config_path = config_path
+        self._logs_path = logs_path
 
         # turn the container name to a valid Python identifier
         snake_case_container_name = self._container_name.replace("-", "_")
@@ -108,7 +110,8 @@ class WorkloadManager(Object):
                 f"{self._exe_name} "
                 f"--config.file={self._config_path} "
                 f"--web.listen-address=:{self._port} "
-                f"--web.external-url={self._web_external_url}"
+                f"--web.external-url={self._web_external_url} "
+                f"| tee >(split -d -b 100000 - {self._logs_path})"
             )
 
         return Layer(
