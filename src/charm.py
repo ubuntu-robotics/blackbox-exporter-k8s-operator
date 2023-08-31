@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 
 import yaml
 from blackbox import ConfigUpdateFailure, WorkloadManager
+from charms.catalogue_k8s.v0.catalogue import CatalogueConsumer, CatalogueItem
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.observability_libs.v0.kubernetes_compute_resources_patch import (
     K8sResourcePatchFailedEvent,
@@ -17,7 +18,6 @@ from charms.observability_libs.v0.kubernetes_compute_resources_patch import (
     ResourceRequirements,
     adjust_resource_requirements,
 )
-from charms.catalogue_k8s.v0.catalogue import CatalogueConsumer, CatalogueItem
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from ops.charm import ActionEvent, CharmBase
 from ops.main import main
