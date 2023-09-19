@@ -223,7 +223,7 @@ class BlackboxExporterCharm(CharmBase):
         # Note: this property is here for convenience, and for semantic reasons.
         # When the charm will have a traefik relation, the `_external_url` should
         # return `self.ingress.url or self._internal_url`.
-        return self._internal_url
+        return self.ingress.url or self._internal_url
 
     @property
     def self_scraping_job(self):
