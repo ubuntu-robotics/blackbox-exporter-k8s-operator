@@ -20,6 +20,7 @@ from charms.observability_libs.v0.kubernetes_compute_resources_patch import (
     adjust_resource_requirements,
 )
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
+from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer
 from ops.charm import ActionEvent, CharmBase
 from ops.main import main
 from ops.model import (
@@ -107,6 +108,15 @@ class BlackboxExporterCharm(CharmBase):
             enable_syslog=False,
         )
 
+        self.ingress = IngressPerAppRequirer(
+            self,
+            port=self._port,
+            scheme=lambda: urlparse(self._internal_url).scheme,
+            strip_prefix=True,
+            redirect_https=True,
+        )
+        self.framework.observe(self.ingress.on.ready, self._handle_ingress)
+        self.framework.observe(self.ingress.on.revoked, self._handle_ingress)
         self.catalog = CatalogueConsumer(
             charm=self,
             refresh_event=[
@@ -135,6 +145,13 @@ class BlackboxExporterCharm(CharmBase):
 
     def _on_k8s_patch_failed(self, event: K8sResourcePatchFailedEvent):
         self.unit.status = BlockedStatus(str(event.message))
+
+    def _handle_ingress(self, _):
+        if url := self.ingress.url:
+            logger.info("Ingress is ready: '%s'.", url)
+        else:
+            logger.info("Ingress revoked.")
+        self._common_exit_hook()
 
     def _on_show_config_action(self, event: ActionEvent):
         """Hook for the show-config action."""
