@@ -220,9 +220,6 @@ class BlackboxExporterCharm(CharmBase):
 
         If not set in the config, return the internal url.
         """
-        # Note: this property is here for convenience, and for semantic reasons.
-        # When the charm will have a traefik relation, the `_external_url` should
-        # return `self.ingress.url or self._internal_url`.
         return self.ingress.url or self._internal_url
 
     @property
