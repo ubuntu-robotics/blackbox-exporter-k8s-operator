@@ -21,6 +21,7 @@ class TestWithInitialHooks(unittest.TestCase):
 
     @patch.object(BlackboxExporterApi, "reload", tautology)
     @patch("socket.getfqdn", new=lambda *args: "fqdn")
+    @patch("charm.BlackboxExporterCharm._external_url", new="http://0.0.0.0/")
     @k8s_resource_multipatch
     @patch("lightkube.core.client.GenericSyncClient")
     @patch.object(WorkloadManager, "_blackbox_exporter_version", property(lambda *_: "0.0.0"))
@@ -71,6 +72,7 @@ class TestWithoutInitialHooks(unittest.TestCase):
     @patch.object(BlackboxExporterApi, "reload", tautology)
     @k8s_resource_multipatch
     @patch("lightkube.core.client.GenericSyncClient")
+    @patch("charm.BlackboxExporterCharm._external_url", new="http://0.0.0.0/")
     def setUp(self, *unused):
         self.harness = Harness(BlackboxExporterCharm)
         self.addCleanup(self.harness.cleanup)
