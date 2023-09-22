@@ -50,6 +50,13 @@ class BlackboxExporterCharm(CharmBase):
         super().__init__(*args)
 
         self.container = self.unit.get_container(self._container_name)
+        self.ingress = IngressPerAppRequirer(
+            self,
+            port=self._port,
+            scheme=lambda: urlparse(self._internal_url).scheme,
+            strip_prefix=True,
+            redirect_https=True,
+        )
 
         # Core lifecycle events
         self.blackbox_workload = WorkloadManager(
@@ -108,13 +115,6 @@ class BlackboxExporterCharm(CharmBase):
             enable_syslog=False,
         )
 
-        self.ingress = IngressPerAppRequirer(
-            self,
-            port=self._port,
-            scheme=lambda: urlparse(self._internal_url).scheme,
-            strip_prefix=True,
-            redirect_https=True,
-        )
         self.framework.observe(self.ingress.on.ready, self._handle_ingress)
         self.framework.observe(self.ingress.on.revoked, self._handle_ingress)
         self.catalog = CatalogueConsumer(
