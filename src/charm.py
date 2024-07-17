@@ -6,6 +6,7 @@
 
 import logging
 import socket
+from typing import cast
 from urllib.parse import urlparse
 
 import yaml
@@ -234,7 +235,7 @@ class BlackboxExporterCharm(CharmBase):
         jobs = []
         external_url = urlparse(self._external_url)
         f"{external_url.path.rstrip('/')}/probe"
-        probes_scrape_jobs = self.model.config.get("probes_file")
+        probes_scrape_jobs = cast(str, self.model.config.get("probes_file"))
         if probes_scrape_jobs:
             probes = yaml.safe_load(probes_scrape_jobs)
             # Add the Blackbox Exporter's `relabel_configs` to each job
@@ -244,7 +245,7 @@ class BlackboxExporterCharm(CharmBase):
                 probe["relabel_configs"] = [
                     {"source_labels": ["__address__"], "target_label": "__param_target"},
                     {"source_labels": ["__param_target"], "target_label": "instance"},
-                    # Copy the scrape job target to an extra label for dahsboard usage
+                    # Copy the scrape job target to an extra label for dashboard usage
                     {"source_labels": ["__param_target"], "target_label": "probe_target"},
                     # Set the address to scrape to the blackbox exporter url
                     {
