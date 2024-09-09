@@ -31,6 +31,9 @@ from ops.model import (
     WaitingStatus,
 )
 from ops.pebble import PathError, ProtocolError
+import base64
+import lzma
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +68,7 @@ class BlackboxExporterCharm(CharmBase):
             self,
             container_name=self._container_name,
             port=self._port,
-            web_external_url=self._external_url,
+            web_external_url="",
             config_path=self._config_path,
             log_path=self._log_path,
         )
@@ -117,7 +120,22 @@ class BlackboxExporterCharm(CharmBase):
             charm=self,
             item=CatalogueItem(
                 name="Blackbox Exporter",
-                url=self._external_url,
+                url=self._external_url + "/",
+                icon="box-variant",
+                description=(
+                    "Blackbox exporter allows blackbox probing of endpoints over a multitude of "
+                    "protocols, including HTTP, HTTPS, DNS, TCP, ICMP and gRPC."
+                ),
+            ),
+        )
+
+
+        self.catalog_grafana_dashboard = CatalogueConsumer(
+            charm=self,
+            relation_name="catalogue_grafana",
+            item=CatalogueItem(
+                name="Blackbox Exporter Grafana Dashboard",
+                url=self._grafana_dashboard_url,
                 icon="box-variant",
                 description=(
                     "Blackbox exporter allows blackbox probing of endpoints over a multitude of "
@@ -201,6 +219,12 @@ class BlackboxExporterCharm(CharmBase):
 
         self.unit.status = ActiveStatus()
 
+    def _decode_dashboard(self, encoded_dashboard_content):
+        """Helper function to decode dashboard from grafana relation."""
+        compressed_content = base64.b64decode(encoded_dashboard_content)
+        decompressed_content = lzma.decompress(compressed_content)
+        return decompressed_content.decode("utf-8")
+
     @property
     def _internal_url(self) -> str:
         """Return the fqdn dns-based in-cluster (private) address of the blackbox exporter."""
@@ -215,12 +239,26 @@ class BlackboxExporterCharm(CharmBase):
         return self.ingress.url or self._internal_url
 
     @property
+    def _grafana_dashboard_url(self) -> str:
+        """Return the grafana dashboard URL."""
+        dashboard_templates = self._grafana_dashboard_provider.dashboard_templates
+        if not self.ingress.is_ready() or not dashboard_templates:
+            return None
+        dashboard_json = self._decode_dashboard(dashboard_templates[0]["content"])
+        dashboard_dict = json.loads(dashboard_json)
+        dashboard_uid = dashboard_dict.get("uid")
+        dashboard_title = dashboard_dict.get("title").replace(" ", "-").lower()
+        grafana_address = self._external_url.replace("blackbox", "grafana")
+        return f"{grafana_address}/d/{dashboard_uid}/{dashboard_title}"
+
+    @property
     def self_scraping_job(self):
         """The self-monitoring scrape job."""
         external_url = urlparse(self._external_url)
         metrics_path = f"{external_url.path.rstrip('/')}/metrics"
+        internal_url = self._internal_url.replace("http://", "")
         target = (
-            f"{external_url.hostname}{':'+str(external_url.port) if external_url.port else ''}"
+            f"{internal_url}"
         )
         job = {
             "metrics_path": metrics_path,
@@ -250,7 +288,7 @@ class BlackboxExporterCharm(CharmBase):
                     # Set the address to scrape to the blackbox exporter url
                     {
                         "target_label": "__address__",
-                        "replacement": self._external_url.replace("http://", ""),
+                        "replacement": self._internal_url.replace("http://", ""),
                     },
                 ]
                 jobs.append(probe)
