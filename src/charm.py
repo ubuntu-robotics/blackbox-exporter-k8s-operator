@@ -22,6 +22,7 @@ from charms.observability_libs.v0.kubernetes_compute_resources_patch import (
 )
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer
+from charms.blackbox_k8s.v0.blackbox_probes import BlackboxProbesRequirer
 from ops.charm import ActionEvent, CharmBase
 from ops.main import main
 from ops.model import (
@@ -65,7 +66,7 @@ class BlackboxExporterCharm(CharmBase):
             self,
             container_name=self._container_name,
             port=self._port,
-            web_external_url=self._external_url,
+            web_external_url='',
             config_path=self._config_path,
             log_path=self._log_path,
         )
@@ -98,6 +99,11 @@ class BlackboxExporterCharm(CharmBase):
             self._on_k8s_patch_failed,
         )
 
+        self._probes_consumer = BlackboxProbesRequirer(
+            charm=self,
+            relation_name="blackbox-probes",
+        )
+
         # - Self monitoring and probes
         self._scraping = MetricsEndpointProvider(
             self,
@@ -117,7 +123,7 @@ class BlackboxExporterCharm(CharmBase):
             charm=self,
             item=CatalogueItem(
                 name="Blackbox Exporter",
-                url=self._external_url,
+                url=self._external_url + "/",
                 icon="box-variant",
                 description=(
                     "Blackbox exporter allows blackbox probing of endpoints over a multitude of "
@@ -219,8 +225,9 @@ class BlackboxExporterCharm(CharmBase):
         """The self-monitoring scrape job."""
         external_url = urlparse(self._external_url)
         metrics_path = f"{external_url.path.rstrip('/')}/metrics"
+        internal_url = self._internal_url.replace("http://", "")
         target = (
-            f"{external_url.hostname}{':'+str(external_url.port) if external_url.port else ''}"
+            f"{internal_url}"
         )
         job = {
             "metrics_path": metrics_path,
@@ -229,17 +236,78 @@ class BlackboxExporterCharm(CharmBase):
 
         return [job]
 
+    def _generate_probes_blackbox_yaml(self, probes):
+        """Generate blackbox static job file from relation.
+
+        This function takes the probes from the BlackboxExporterRequirer and
+        generate a yaml file to be used.
+        """
+        scrape_configs = []
+
+        for probe_type, targets in probes.items():
+            job_name = f'blackbox_{probe_type}' # TODO: how to make sure job name is unique
+            scrape_config = {
+                'job_name': job_name,
+                'metrics_path': '/probe',
+                'params': {
+                    'module': [probe_type]
+                },
+                'static_configs': [
+                    {'targets': targets}
+                ]
+            }
+            scrape_configs.append(scrape_config)
+
+        return yaml.dump({'scrape_configs': scrape_configs})
+
+    # TODO: once we pass the modules update the config
+    def _update_blackbox_config_yaml_from_relation(self, modules, config_path):
+        """Update the blackbox config yaml with modules defined in relation.
+
+        This function takes the modules from the BlackboxExporterRequirer and
+        updates the config file with the required modules.
+        """
+        with open(config_path, 'r') as file:
+            config_data = yaml.safe_load(file)
+
+        if 'modules' not in config_data:
+            config_data['modules'] = {}
+
+        for module_name, module_data in modules.items():
+            if module_name not in config_data['modules']:
+                config_data['modules'][module_name] = module_data
+
+        return config_data
+
+    def _merge_scrape_configs(self, file_probes, relation_probes):
+        """Merge the scrape_configs from both file and relation."""
+        merged_scrape_configs = {probe['job_name']: probe for probe in file_probes.get('scrape_configs', [])}
+
+        for probe in relation_probes.get('scrape_configs', []):
+            job_name = probe['job_name']
+            # TODO: what if the job_name is the same? is this possible or we can assume it is not?
+            merged_scrape_configs[job_name] = probe
+        return list(merged_scrape_configs.values())
+
     @property
     def probes_scraping_jobs(self):
         """The scraping jobs to execute probes from Prometheus."""
         jobs = []
         external_url = urlparse(self._external_url)
         f"{external_url.path.rstrip('/')}/probe"
-        probes_scrape_jobs = cast(str, self.model.config.get("probes_file"))
-        if probes_scrape_jobs:
-            probes = yaml.safe_load(probes_scrape_jobs)
-            # Add the Blackbox Exporter's `relabel_configs` to each job
-            for probe in probes["scrape_configs"]:
+
+        # get probes from file and relation
+        file_probes_scrape_jobs = cast(str, self.model.config.get("probes_file"))
+        relation_probes_scrape_jobs = self._generate_probes_blackbox_yaml(self._probes_consumer.probes())
+
+        # load relation and file probes as yaml if they exist and merge them
+        file_probes_scrape_jobs = yaml.safe_load(file_probes_scrape_jobs) if file_probes_scrape_jobs else {}
+        relation_probes_scrape_jobs = yaml.safe_load(relation_probes_scrape_jobs) if relation_probes_scrape_jobs else {}
+        merged_scrape_configs = self._merge_scrape_configs(file_probes_scrape_jobs, relation_probes_scrape_jobs)
+
+        # Add the Blackbox Exporter's `relabel_configs` to each job
+        if merged_scrape_configs:
+            for probe in merged_scrape_configs:
                 # The relabel configs come from the official Blackbox Exporter docs; please refer
                 # to that for further information on what they do
                 probe["relabel_configs"] = [
@@ -250,11 +318,11 @@ class BlackboxExporterCharm(CharmBase):
                     # Set the address to scrape to the blackbox exporter url
                     {
                         "target_label": "__address__",
-                        "replacement": self._external_url.replace("http://", ""),
+                        "replacement": self._internal_url.replace("http://", ""),
                     },
                 ]
                 jobs.append(probe)
-
+        logger.info("jobs FINAL: %s", jobs)
         return jobs
 
     def _on_pebble_ready(self, _):
