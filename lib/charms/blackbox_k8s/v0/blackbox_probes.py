@@ -11,6 +11,7 @@ library. The goal of this library is to be as simple to use as possible.
 
 import logging
 import json
+import yaml
 from typing import Dict, List, Optional, Union
 
 from ops import Object
@@ -37,7 +38,7 @@ LIBAPI = 0
 # to 0 if you are raising the major API version
 LIBPATCH = 1
 
-logging = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 DEFAULT_RELATION_NAME = "blackbox-probes"
 
@@ -47,7 +48,7 @@ class BlackboxProbesProvider(Object):
     def __init__(
         self,
         charm: CharmBase,
-        probes: Dict[str, List[str]],
+        probes: List,
         modules: Optional[Dict] = None,
         refresh_event: Optional[Union[BoundEvent, List[BoundEvent]]] = None,
         relation_name: str = DEFAULT_RELATION_NAME,
@@ -60,10 +61,27 @@ class BlackboxProbesProvider(Object):
 
             self.blackbox_probes = BlackboxProbesProvider(
                 self,
-                probes={
-                    "http_2xx": ["https://endpoint-a.com", "https://endpoint-b.com"],
-                    "http_2xx_longer_timeout": ["https://endpoint-c.com"]
-                },
+                probes = [
+                    ""
+                    - job_name: 'blackbox_http_2xx'
+                      metrics_path: /probe
+                      params:
+                        module: [http_2xx]
+                      static_configs:
+                        - targets: 
+                            - http://target-a
+                            labels: 
+                                name: "device"
+                    "",
+                    ""
+                    - job_name: 'blackbox_http_2xx_longer_timeout'
+                      metrics_path: /probe
+                      params:
+                        module: [http_2xx_longer_timeout]
+                      static_configs:
+                        - targets: ['http://target-b' 'http://target-c']
+                    ""
+                ],
                 modules={
                     "http_2xx_longer_timeout": {
                         "prober": "http"
@@ -100,9 +118,8 @@ class BlackboxProbesProvider(Object):
         self._relation_name = relation_name
 
         events = self._charm.on[self._relation_name]
-        self.framework.observe(events.relation_changed, self._on_relation_changed)
         self._probes = [] if probes is None else probes
-        self._modules = [] if modules is None else modules
+        self._modules = {} if modules is None else modules
 
         if not refresh_event:
             if len(self._charm.meta.containers) == 1:
@@ -113,12 +130,14 @@ class BlackboxProbesProvider(Object):
         elif not isinstance(refresh_event, list):
             refresh_event = [refresh_event]
 
+        topology = JujuTopology.from_dict(self._scrape_metadata)
+        module_name_prefix = "juju_{}_".format(topology.identifier)
+        self._prefix_probes(module_name_prefix)
+        self._prefix_modules(module_name_prefix)
+
         self.framework.observe(events.relation_joined, self.set_probes_spec)
         for ev in refresh_event:
             self.framework.observe(ev, self.set_probes_spec)
-
-    def _on_relation_changed(self, event):
-        pass
 
     def set_probes_spec(self, _=None):
         """Ensure probes target information is made available to Blackbox Exporter.
@@ -133,6 +152,23 @@ class BlackboxProbesProvider(Object):
             relation.data[self._charm.app]["scrape_metadata"] = json.dumps(self._scrape_metadata)
             relation.data[self._charm.app]["scrape_probes"] = json.dumps(self._probes)
             relation.data[self._charm.app]["scrape_modules"] = json.dumps(self._modules)
+
+    def _prefix_probes(self, prefix: str):
+        """Prefix the job_names and the probes_modules with the charm metadata."""
+        for job in self._probes:
+            job_name = job["job_name"]
+            job["job_name"] = prefix + "_" + job_name if job_name else prefix
+            job_params = job["params"].get('params', {}).get('module', [])
+            for param in job_params:
+                modules = param["module"]
+                for module in modules:
+                    if module in self._modules:
+                        prefixed_module_value = f"{prefix}_{module}"
+                        job['params']['module'] = prefixed_module_value
+
+    def _prefix_modules(self, prefix: str) -> None:
+        """Prefix the modules with the charm metadata."""
+        self._modules = {f"{prefix}{key}": value for key, value in self._modules.items()}
 
     @property
     def _scrape_metadata(self) -> dict:
@@ -228,18 +264,18 @@ class BlackboxProbesRequirer(Object):
         rel_id = event.relation.id
         self.on.targets_changed.emit(relation_id=rel_id)
 
-    def probes(self) -> dict:
+    def probes(self) -> list:
         """Fetch the dict of probes to scrape.
 
         Returns:
             A dict consisting of all the static probes configurations
             for each related `BlackboxExporterProvider'.
         """
-        scrape_probes = {}
+        scrape_probes = []
 
         for relation in self._charm.model.relations[self._relation_name]:
-            static_probes_jobs = json.loads(relation.data[relation.app].get("scrape_probes", "{}"))
-            scrape_probes.update(static_probes_jobs)
+            static_probes_jobs = json.loads(relation.data[relation.app].get("scrape_probes", "[]"))
+            scrape_probes.extend(static_probes_jobs)
 
         return scrape_probes
 
@@ -254,7 +290,6 @@ class BlackboxProbesRequirer(Object):
 
         for relation in self._charm.model.relations[self._relation_name]:
             scrape_modules = json.loads(relation.data[relation.app].get("scrape_modules", "{}"))
-            # TODO: prefix modules with metadata
             blackbox_scrape_modules.update(scrape_modules)
 
         return blackbox_scrape_modules

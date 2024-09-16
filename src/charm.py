@@ -236,39 +236,18 @@ class BlackboxExporterCharm(CharmBase):
 
         return [job]
 
-    def _generate_probes_blackbox_yaml(self, probes):
-        """Generate blackbox static job file from relation.
-
-        This function takes the probes from the BlackboxExporterRequirer and
-        generate a yaml file to be used.
-        """
-        scrape_configs = []
-
-        for probe_type, targets in probes.items():
-            job_name = f'blackbox_{probe_type}' # TODO: how to make sure job name is unique
-            scrape_config = {
-                'job_name': job_name,
-                'metrics_path': '/probe',
-                'params': {
-                    'module': [probe_type]
-                },
-                'static_configs': [
-                    {'targets': targets}
-                ]
-            }
-            scrape_configs.append(scrape_config)
-
-        return yaml.dump({'scrape_configs': scrape_configs})
-
-    # TODO: once we pass the modules update the config
-    def _update_blackbox_config_yaml_from_relation(self, modules, config_path):
+    def _update_blackbox_config_yaml_from_relation(self, modules):
         """Update the blackbox config yaml with modules defined in relation.
 
         This function takes the modules from the BlackboxExporterRequirer and
         updates the config file with the required modules.
         """
-        with open(config_path, 'r') as file:
-            config_data = yaml.safe_load(file)
+        config_file_data = self.container.pull(self._config_path).read()
+
+        if not config_file_data:
+            return
+
+        config_data = yaml.safe_load(config_file_data)
 
         if 'modules' not in config_data:
             config_data['modules'] = {}
@@ -277,15 +256,15 @@ class BlackboxExporterCharm(CharmBase):
             if module_name not in config_data['modules']:
                 config_data['modules'][module_name] = module_data
 
-        return config_data
+        updated_config_data = yaml.safe_dump(config_data)
+        self.container.push(self._config_path, updated_config_data)
 
     def _merge_scrape_configs(self, file_probes, relation_probes):
         """Merge the scrape_configs from both file and relation."""
         merged_scrape_configs = {probe['job_name']: probe for probe in file_probes.get('scrape_configs', [])}
 
-        for probe in relation_probes.get('scrape_configs', []):
+        for probe in relation_probes:
             job_name = probe['job_name']
-            # TODO: what if the job_name is the same? is this possible or we can assume it is not?
             merged_scrape_configs[job_name] = probe
         return list(merged_scrape_configs.values())
 
@@ -296,13 +275,17 @@ class BlackboxExporterCharm(CharmBase):
         external_url = urlparse(self._external_url)
         f"{external_url.path.rstrip('/')}/probe"
 
+        # check if there are modules from relation and update config
+        relation_modules = self._probes_consumer.modules()
+        if relation_modules:
+            self._update_blackbox_config_yaml_from_relation(self._probes_consumer.modules())
+
         # get probes from file and relation
         file_probes_scrape_jobs = cast(str, self.model.config.get("probes_file"))
-        relation_probes_scrape_jobs = self._generate_probes_blackbox_yaml(self._probes_consumer.probes())
+        relation_probes_scrape_jobs = self._probes_consumer.probes()
 
         # load relation and file probes as yaml if they exist and merge them
         file_probes_scrape_jobs = yaml.safe_load(file_probes_scrape_jobs) if file_probes_scrape_jobs else {}
-        relation_probes_scrape_jobs = yaml.safe_load(relation_probes_scrape_jobs) if relation_probes_scrape_jobs else {}
         merged_scrape_configs = self._merge_scrape_configs(file_probes_scrape_jobs, relation_probes_scrape_jobs)
 
         # Add the Blackbox Exporter's `relabel_configs` to each job
