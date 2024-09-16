@@ -104,6 +104,11 @@ class BlackboxExporterCharm(CharmBase):
             relation_name="blackbox-probes",
         )
 
+        self.framework.observe(
+            self._probes_consumer.on.targets_changed,
+            self._on_probes_modules_config_changed
+        )
+
         # - Self monitoring and probes
         self._scraping = MetricsEndpointProvider(
             self,
@@ -112,6 +117,7 @@ class BlackboxExporterCharm(CharmBase):
             refresh_event=[
                 self.on.config_changed,
                 self.on.update_status,
+                self._probes_consumer.on.targets_changed,
             ],
         )
         self._grafana_dashboard_provider = GrafanaDashboardProvider(charm=self)
@@ -119,6 +125,7 @@ class BlackboxExporterCharm(CharmBase):
 
         self.framework.observe(self.ingress.on.ready, self._handle_ingress)
         self.framework.observe(self.ingress.on.revoked, self._handle_ingress)
+
         self.catalog = CatalogueConsumer(
             charm=self,
             item=CatalogueItem(
@@ -275,15 +282,9 @@ class BlackboxExporterCharm(CharmBase):
         external_url = urlparse(self._external_url)
         f"{external_url.path.rstrip('/')}/probe"
 
-        # check if there are modules from relation and update config
-        relation_modules = self._probes_consumer.modules()
-        if relation_modules:
-            self._update_blackbox_config_yaml_from_relation(self._probes_consumer.modules())
-
         # get probes from file and relation
         file_probes_scrape_jobs = cast(str, self.model.config.get("probes_file"))
         relation_probes_scrape_jobs = self._probes_consumer.probes()
-
         # load relation and file probes as yaml if they exist and merge them
         file_probes_scrape_jobs = yaml.safe_load(file_probes_scrape_jobs) if file_probes_scrape_jobs else {}
         merged_scrape_configs = self._merge_scrape_configs(file_probes_scrape_jobs, relation_probes_scrape_jobs)
@@ -291,6 +292,7 @@ class BlackboxExporterCharm(CharmBase):
         # Add the Blackbox Exporter's `relabel_configs` to each job
         if merged_scrape_configs:
             for probe in merged_scrape_configs:
+                probe["metrics_path"] = "/probe"
                 # The relabel configs come from the official Blackbox Exporter docs; please refer
                 # to that for further information on what they do
                 probe["relabel_configs"] = [
@@ -326,6 +328,12 @@ class BlackboxExporterCharm(CharmBase):
         # the config may need update. Calling the common hook to update.
         self._common_exit_hook()
 
+    def _on_probes_modules_config_changed(self, _):
+        """Event handler for probes target changed."""
+        relation_modules = self._probes_consumer.modules()
+        if relation_modules:
+            self._update_blackbox_config_yaml_from_relation(self._probes_consumer.modules())
+        self._common_exit_hook()
 
 if __name__ == "__main__":
     main(BlackboxExporterCharm)
