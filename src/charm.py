@@ -10,7 +10,7 @@ from typing import cast
 from urllib.parse import urlparse
 
 import yaml
-from blackbox import ConfigUpdateFailure, WorkloadManager
+from charms.blackbox_k8s.v0.blackbox_probes import BlackboxProbesRequirer
 from charms.catalogue_k8s.v1.catalogue import CatalogueConsumer, CatalogueItem
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v1.loki_push_api import LogForwarder
@@ -22,7 +22,6 @@ from charms.observability_libs.v0.kubernetes_compute_resources_patch import (
 )
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer
-from charms.blackbox_k8s.v0.blackbox_probes import BlackboxProbesRequirer
 from ops.charm import ActionEvent, CharmBase
 from ops.main import main
 from ops.model import (
@@ -32,6 +31,8 @@ from ops.model import (
     WaitingStatus,
 )
 from ops.pebble import PathError, ProtocolError
+
+from blackbox import ConfigUpdateFailure, WorkloadManager
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,7 @@ class BlackboxExporterCharm(CharmBase):
             self,
             container_name=self._container_name,
             port=self._port,
-            web_external_url='',
+            web_external_url="",
             config_path=self._config_path,
             log_path=self._log_path,
         )
@@ -105,8 +106,7 @@ class BlackboxExporterCharm(CharmBase):
         )
 
         self.framework.observe(
-            self._probes_consumer.on.targets_changed,
-            self._on_probes_modules_config_changed
+            self._probes_consumer.on.targets_changed, self._on_probes_modules_config_changed
         )
 
         # - Self monitoring and probes
@@ -233,9 +233,7 @@ class BlackboxExporterCharm(CharmBase):
         external_url = urlparse(self._external_url)
         metrics_path = f"{external_url.path.rstrip('/')}/metrics"
         internal_url = self._internal_url.replace("http://", "")
-        target = (
-            f"{internal_url}"
-        )
+        target = f"{internal_url}"
         job = {
             "metrics_path": metrics_path,
             "static_configs": [{"targets": [target]}],
@@ -256,22 +254,24 @@ class BlackboxExporterCharm(CharmBase):
 
         config_data = yaml.safe_load(config_file_data)
 
-        if 'modules' not in config_data:
-            config_data['modules'] = {}
+        if "modules" not in config_data:
+            config_data["modules"] = {}
 
         for module_name, module_data in modules.items():
-            if module_name not in config_data['modules']:
-                config_data['modules'][module_name] = module_data
+            if module_name not in config_data["modules"]:
+                config_data["modules"][module_name] = module_data
 
         updated_config_data = yaml.safe_dump(config_data)
         self.container.push(self._config_path, updated_config_data)
 
     def _merge_scrape_configs(self, file_probes, relation_probes):
         """Merge the scrape_configs from both file and relation."""
-        merged_scrape_configs = {probe['job_name']: probe for probe in file_probes.get('scrape_configs', [])}
+        merged_scrape_configs = {
+            probe["job_name"]: probe for probe in file_probes.get("scrape_configs", [])
+        }
 
         for probe in relation_probes:
-            job_name = probe['job_name']
+            job_name = probe["job_name"]
             merged_scrape_configs[job_name] = probe
         return list(merged_scrape_configs.values())
 
@@ -286,8 +286,12 @@ class BlackboxExporterCharm(CharmBase):
         file_probes_scrape_jobs = cast(str, self.model.config.get("probes_file"))
         relation_probes_scrape_jobs = self._probes_consumer.probes()
         # load relation and file probes as yaml if they exist and merge them
-        file_probes_scrape_jobs = yaml.safe_load(file_probes_scrape_jobs) if file_probes_scrape_jobs else {}
-        merged_scrape_configs = self._merge_scrape_configs(file_probes_scrape_jobs, relation_probes_scrape_jobs)
+        file_probes_scrape_jobs = (
+            yaml.safe_load(file_probes_scrape_jobs) if file_probes_scrape_jobs else {}
+        )
+        merged_scrape_configs = self._merge_scrape_configs(
+            file_probes_scrape_jobs, relation_probes_scrape_jobs
+        )
 
         # Add the Blackbox Exporter's `relabel_configs` to each job
         if merged_scrape_configs:
@@ -331,9 +335,12 @@ class BlackboxExporterCharm(CharmBase):
     def _on_probes_modules_config_changed(self, _):
         """Event handler for probes target changed."""
         relation_modules = self._probes_consumer.modules()
+        ## TODO: this needs to take into account the fact that we can load configuration manually
+        ## maybe leave modules addition as a future feature.
         if relation_modules:
             self._update_blackbox_config_yaml_from_relation(self._probes_consumer.modules())
         self._common_exit_hook()
+
 
 if __name__ == "__main__":
     main(BlackboxExporterCharm)

@@ -1,7 +1,7 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Blackbox Probes Libray.
+"""Blackbox Probes Library.
 
 ## Overview
 
@@ -15,13 +15,13 @@ library. The goal of this library is to be as simple to use as possible.
 Charms seeking to expose metric endpoints to be probed via Blackbox, must do so
 using the `BlackboxProbesProvider` object from this charm library.
 For the simplest use cases, the BlackboxProbesProvider object requires
-to be instanciated with a list of jobs with the endpoints to monitor.
+to be instantiated with a list of jobs with the endpoints to monitor.
 A probe in blackbox is defined by a module and a static_config target. Those
-are then organised in a prometheus job for propoer scraping.
+are then organised in a prometheus job for proper scraping.
 The `BlackboxProbesProvider` constructor requires
 the name of the relation over which a probe target
 is exposed to the Blakcbox Exporter charm. This relation must use the
-`blackbox_targets` interface.
+`blackbox_probes` interface.
 The default name for the metrics endpoint relation is
 `blackbox0targets`. It is strongly recommended to use the same
 relation name for consistency across charms and doing so obviates the
@@ -148,9 +148,9 @@ purposes a Blackbox Exporter charm needs to do two thingsL
 1. Instantiate the `BlackboxProbesRequirer` object by providing it a
 reference to the parent (Blackbox Exporter) charm and optionally the name of
 the relation that the Blackbox Exporter charm uses to interact with probes
-targets. This relation must confirm to the `blackbox_targets`
+targets. This relation must confirm to the `blackbox_probes`
 interface and it is strongly recommended that this relation be named
-`blackbox-targets` which is its default value.
+`blackbox-probes` which is its default value.
 
 For example a Blackbox Exporter may instantiate the
 `BlackboxProbesRequirer` in its constructor as follows
@@ -166,7 +166,7 @@ For example a Blackbox Exporter may instantiate the
         )
         ...
 
-The probes consumer must be instanciated before the prometheus_scrape MetricsEndpoint Provider,
+The probes consumer must be instantiated before the prometheus_scrape MetricsEndpoint Provider,
 because Blackbox uses the probes to define metrics endpoints to Prometheus.
 
 2. A Blackbox Exporter charm also needs to respond to the
@@ -184,19 +184,9 @@ is added and/or old ones removed from the list.
 For this purpose the `BlackboxProbesRequirer` object
 exposes a `probes()` method that returns a list of probes jobs. Each
 element of this list is a probes configuration to be added to the list of jobs for
-Prometheus to monitor. In order to update the Prometheus configuration, the Prometheus
-charm needs to replace the current list of jobs with the list provided
-by `jobs()` as follows
-
-    def _on_scrape_targets_changed(self, event):
-        ...
-        scrape_jobs = self.metrics_consumer.jobs()
-        for job in scrape_jobs:
-            prometheus_scrape_config.append(job)
-        ...
-
+Prometheus to monitor. 
 Same goes for the list of client charm defined modules. The `BlackboxProbesRequirer` object
-exposes a `modules()` method that returns a dict of the new modules to be added to the
+exposes an option `modules()` method that returns a dict of the new modules to be added to the
 Blackbox configuration file.
 """
 
@@ -238,7 +228,7 @@ class BlackboxProbesProvider(Object):
     def __init__(
         self,
         charm: CharmBase,
-        probes: List,
+        probes: List[Dict],
         modules: Optional[Dict] = None,
         refresh_event: Optional[Union[BoundEvent, List[BoundEvent]]] = None,
         relation_name: str = DEFAULT_RELATION_NAME,
@@ -295,15 +285,16 @@ class BlackboxProbesProvider(Object):
                 on which the probes and modules should be updated.
             relation_name: name of the relation providing the Blackbox Probes
                 service. It's recommended to not change it, to ensure a
-                consistent experience acrosss all charms that use the library.
+                consistent experience across all charms that use the library.
         """
         self.topology = JujuTopology.from_charm(charm)
         self._charm = charm
         self._relation_name = relation_name
-
-        events = self._charm.on[self._relation_name]
         self._probes = [] if probes is None else probes
         self._modules = {} if modules is None else modules
+
+        events = self._charm.on[self._relation_name]
+        self.framework.observe(events.relation_changed, self.set_probes_spec)
 
         if not refresh_event:
             if len(self._charm.meta.containers) == 1:
@@ -323,6 +314,10 @@ class BlackboxProbesProvider(Object):
         for ev in refresh_event:
             self.framework.observe(ev, self.set_probes_spec)
 
+    #TODO: make sure the probes passed have at least PARAMS MODULE and STATIC_CONFIG
+    def validate_probes(self):
+        pass
+
     def set_probes_spec(self, _=None):
         """Ensure probes target information is made available to Blackbox Exporter.
 
@@ -339,16 +334,14 @@ class BlackboxProbesProvider(Object):
 
     def _prefix_probes(self, prefix: str):
         """Prefix the job_names and the probes_modules with the charm metadata."""
-        for job in self._probes:
-            job_name = job["job_name"]
-            job["job_name"] = prefix + "_" + job_name if job_name else prefix
-            job_params = job["params"].get('params', {}).get('module', [])
-            for param in job_params:
-                modules = param["module"]
-                for module in modules:
-                    if module in self._modules:
-                        prefixed_module_value = f"{prefix}_{module}"
-                        job['params']['module'] = prefixed_module_value
+        for probe in self._probes:
+            job_name = probe["job_name"]
+            probe["job_name"] = prefix + job_name if job_name else prefix
+            probe_module = probe.get("params", {}).get("module", [])
+            for module in probe_module:
+                if module in self._modules:
+                    prefixed_module_value = f"{prefix}_{module}"
+                    probe['params']['module'] = prefixed_module_value
 
     def _prefix_modules(self, prefix: str) -> None:
         """Prefix the modules with the charm metadata."""
