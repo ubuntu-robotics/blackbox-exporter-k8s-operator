@@ -202,6 +202,9 @@ class BlackboxExporterCharm(CharmBase):
         # Update config file
         try:
             self.blackbox_workload.update_config()
+            modules_from_relation = self._probes_consumer.modules()
+            if modules_from_relation:
+                self._update_blackbox_config_yaml_from_relation(modules_from_relation)
         except ConfigUpdateFailure as e:
             self.unit.status = BlockedStatus(str(e))
             return
@@ -334,13 +337,7 @@ class BlackboxExporterCharm(CharmBase):
 
     def _on_probes_modules_config_changed(self, _):
         """Event handler for probes target changed."""
-        relation_modules = self._probes_consumer.modules()
-        ## TODO: this needs to take into account the fact that we can load configuration manually
-        ## maybe leave modules addition as a future feature.
-        if relation_modules:
-            self._update_blackbox_config_yaml_from_relation(self._probes_consumer.modules())
         self._common_exit_hook()
-
 
 if __name__ == "__main__":
     main(BlackboxExporterCharm)
