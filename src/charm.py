@@ -202,6 +202,9 @@ class BlackboxExporterCharm(CharmBase):
         # Update config file
         try:
             self.blackbox_workload.update_config()
+            modules_from_relation = self._probes_consumer.modules()
+            if modules_from_relation:
+                self._update_blackbox_config_yaml_from_relation(modules_from_relation)
         except ConfigUpdateFailure as e:
             self.unit.status = BlockedStatus(str(e))
             return
@@ -241,7 +244,7 @@ class BlackboxExporterCharm(CharmBase):
 
         return [job]
 
-    def _update_blackbox_config_yaml_from_relation(self, modules):
+    def _update_blackbox_config_yaml_from_relation(self, modules) -> None:
         """Update the blackbox config yaml with modules defined in relation.
 
         This function takes the modules from the BlackboxExporterRequirer and
@@ -263,8 +266,9 @@ class BlackboxExporterCharm(CharmBase):
 
         updated_config_data = yaml.safe_dump(config_data)
         self.container.push(self._config_path, updated_config_data)
+        self.blackbox_workload.reload()
 
-    def _merge_scrape_configs(self, file_probes, relation_probes):
+    def _merge_scrape_configs(self, file_probes, relation_probes) -> list:
         """Merge the scrape_configs from both file and relation."""
         merged_scrape_configs = {
             probe["job_name"]: probe for probe in file_probes.get("scrape_configs", [])
@@ -334,11 +338,6 @@ class BlackboxExporterCharm(CharmBase):
 
     def _on_probes_modules_config_changed(self, _):
         """Event handler for probes target changed."""
-        relation_modules = self._probes_consumer.modules()
-        ## TODO: this needs to take into account the fact that we can load configuration manually
-        ## maybe leave modules addition as a future feature.
-        if relation_modules:
-            self._update_blackbox_config_yaml_from_relation(self._probes_consumer.modules())
         self._common_exit_hook()
 
 
