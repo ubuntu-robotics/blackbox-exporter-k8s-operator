@@ -49,3 +49,5 @@ requires:
     interface: catalogue
   catalogue_grafana:
     interface: catalogue
+  blackbox-probes:
+    interface: blackbox_probes
