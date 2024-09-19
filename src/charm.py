@@ -281,7 +281,7 @@ class BlackboxExporterCharm(CharmBase):
 
         return [job]
 
-    def _update_blackbox_config_yaml_from_relation(self, modules):
+    def _update_blackbox_config_yaml_from_relation(self, modules) -> None:
         """Update the blackbox config yaml with modules defined in relation.
 
         This function takes the modules from the BlackboxExporterRequirer and
@@ -303,8 +303,9 @@ class BlackboxExporterCharm(CharmBase):
 
         updated_config_data = yaml.safe_dump(config_data)
         self.container.push(self._config_path, updated_config_data)
+        self.blackbox_workload.reload()
 
-    def _merge_scrape_configs(self, file_probes, relation_probes):
+    def _merge_scrape_configs(self, file_probes, relation_probes) -> list:
         """Merge the scrape_configs from both file and relation."""
         merged_scrape_configs = {
             probe["job_name"]: probe for probe in file_probes.get("scrape_configs", [])

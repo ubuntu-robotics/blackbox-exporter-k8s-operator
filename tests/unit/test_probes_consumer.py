@@ -150,5 +150,5 @@ class BlackboxProbesRequirerTest(unittest.TestCase):
         self.setup_charm_relations()
 
         probes = self.harness.charm.probes_consumer.probes()
-        self.assertEqual(len(probes), 2)  # two wildcards and one fully-qualified
+        self.assertEqual(len(probes), 2)
         self.validate_probes(probes)
