@@ -27,7 +27,6 @@ provides:
 PROBES: List[dict] = [
     {
         "job_name": "my-first-job",
-        "disallowed_key": "irrelavent_value",
         "params": {"module": ["http_2xx"]},
         "static_configs": [
             {
@@ -43,6 +42,25 @@ PROBES: List[dict] = [
         },
         "static_configs": [
             {"targets": ["10.1.238.1"], "labels": {"some_other_key": "some-other-value"}}
+        ],
+    },
+]
+
+PROBES_NOT_VALID_MISSING_STATIC_CONFIG: List[dict] = [
+    {
+        "job_name": "my-first-job",
+        "params": {"module": ["http_2xx"]},
+    }
+]
+
+PROBES_NOT_VALID_MISSING_MODULE: List[dict] = [
+    {
+        "job_name": "my-first-job",
+        "static_configs": [
+            {
+                "targets": ["10.1.238.1"],
+                "labels": {"some_key": "some-value"},
+            }
         ],
     },
 ]
@@ -129,3 +147,34 @@ class BlackboxProbesProviderTest(unittest.TestCase):
         module_name_prefix = "juju_{}_".format(topology.identifier)
 
         self.assertEqual(scrape_data[0]["job_name"], f"{module_name_prefix}my-first-job")
+
+
+class BlackboxProbesProviderCharmWithWrongProbe(CharmBase):
+    _stored = StoredState()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args)
+        self._stored.set_default(num_events=0)
+        self.provider = BlackboxProbesProvider(
+            self, probes=PROBES_NOT_VALID_MISSING_MODULE, modules=MODULES
+        )
+        self.framework.observe(self.provider.on.invalid_probe, self.record_events)
+
+    def record_events(self, event):
+        self._stored.num_events += 1
+
+
+class BlackboxProbesWrongProviderTest(unittest.TestCase):
+    def setUp(self):
+        self.harness = Harness(BlackboxProbesProviderCharmWithWrongProbe, meta=PROVIDER_META)
+        self.harness.set_model_name("MyUUID")
+        self.addCleanup(self.harness.cleanup)
+        self.harness.set_leader(True)
+        self.harness.begin()
+
+    def test_provider_notifies_on_invalid_probe(self):
+        self.assertEqual(self.harness.charm._stored.num_events, 0)
+        rel_id = self.harness.add_relation(RELATION_NAME, "provider")
+        self.harness.add_relation_unit(rel_id, "provider/0")
+        self.harness.charm.provider.set_probes_spec()
+        self.assertEqual(self.harness.charm._stored.num_events, 2)
