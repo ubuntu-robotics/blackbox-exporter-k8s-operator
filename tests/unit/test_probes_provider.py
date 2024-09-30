@@ -103,6 +103,7 @@ class BlackboxProbesProviderTest(unittest.TestCase):
         self.assertIn("model", scrape_metadata)
         self.assertIn("model_uuid", scrape_metadata)
         self.assertIn("application", scrape_metadata)
+        self.assertIn("unit", scrape_metadata)
 
     @patch_network_get()
     def test_provider_sets_probes_on_relation_joined(self):
