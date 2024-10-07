@@ -31,9 +31,7 @@ from ops.model import (
     WaitingStatus,
 )
 from ops.pebble import PathError, ProtocolError
-import base64
-import lzma
-import json
+import re
 
 from blackbox import ConfigUpdateFailure, WorkloadManager
 
@@ -235,12 +233,6 @@ class BlackboxExporterCharm(CharmBase):
 
         self.unit.status = ActiveStatus()
 
-    def _decode_dashboard(self, encoded_dashboard_content):
-        """Helper function to decode dashboard from grafana relation."""
-        compressed_content = base64.b64decode(encoded_dashboard_content)
-        decompressed_content = lzma.decompress(compressed_content)
-        return decompressed_content.decode("utf-8")
-
     @property
     def _internal_url(self) -> str:
         """Return the fqdn dns-based in-cluster (private) address of the blackbox exporter."""
@@ -256,16 +248,12 @@ class BlackboxExporterCharm(CharmBase):
 
     @property
     def _grafana_dashboard_url(self) -> str:
-        """Return the grafana dashboard URL."""
-        dashboard_templates = self._grafana_dashboard_provider.dashboard_templates
-        if not self.ingress.is_ready() or not dashboard_templates:
+        """Return the Blackbox Exporter Grafana dashboard URL."""
+        if not self.ingress.is_ready():
             return ""
-        dashboard_json = self._decode_dashboard(dashboard_templates[0]["content"])
-        dashboard_dict = json.loads(dashboard_json)
-        dashboard_uid = dashboard_dict.get("uid")
-        dashboard_title = dashboard_dict.get("title").replace(" ", "-").lower()
-        grafana_address = self._external_url.replace("blackbox", "grafana")
-        return f"{grafana_address}/d/{dashboard_uid}/{dashboard_title}"
+        grafana_address = re.sub(r'blackbox[\w\-]*', 'grafana', self._external_url)
+        dashboard_uid = self.model.config.get("grafana_dashboard_uid")
+        return f"{grafana_address}/d/{dashboard_uid}/blackbox-exporter"
 
     @property
     def self_scraping_job(self):

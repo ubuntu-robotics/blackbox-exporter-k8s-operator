@@ -30,3 +30,8 @@ options:
       automatically deduced from it).
       See https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
     type: string
+  grafana_dashboard_uid:
+    default: ""
+    description: |
+      The url to the Blackbox Exporter Grafana dashboard for direct visualization in the Catalogue.
+    type: string
