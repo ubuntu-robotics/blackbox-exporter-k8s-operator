@@ -312,6 +312,8 @@ class BlackboxExporterCharm(CharmBase):
         }
 
         for probe in relation_probes:
+            if not isinstance(probe, dict):
+                probe = dict(probe)
             job_name = probe["job_name"]
             merged_scrape_configs[job_name] = probe
         return list(merged_scrape_configs.values())
@@ -352,7 +354,6 @@ class BlackboxExporterCharm(CharmBase):
                     },
                 ]
                 jobs.append(probe)
-        logger.info("jobs FINAL: %s", jobs)
         return jobs
 
     def _on_pebble_ready(self, _):
