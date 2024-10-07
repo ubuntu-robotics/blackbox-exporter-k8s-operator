@@ -127,33 +127,9 @@ class BlackboxExporterCharm(CharmBase):
         self.framework.observe(self.ingress.on.ready, self._handle_ingress)
         self.framework.observe(self.ingress.on.revoked, self._handle_ingress)
 
-        self.catalog = CatalogueConsumer(
-            charm=self,
-            item=CatalogueItem(
-                name="Blackbox Exporter",
-                url=self._external_url + "/",
-                icon="box-variant",
-                description=(
-                    "Blackbox exporter allows blackbox probing of endpoints over a multitude of "
-                    "protocols, including HTTP, HTTPS, DNS, TCP, ICMP and gRPC."
-                ),
-            ),
-        )
+        self.catalog = CatalogueConsumer(charm=self, item=self._catalogue_item)
 
-
-        self.catalog_grafana_dashboard = CatalogueConsumer(
-            charm=self,
-            relation_name="catalogue_grafana",
-            item=CatalogueItem(
-                name="Blackbox Exporter Grafana Dashboard",
-                url=self._grafana_dashboard_url,
-                icon="box-variant",
-                description=(
-                    "Blackbox exporter allows blackbox probing of endpoints over a multitude of "
-                    "protocols, including HTTP, HTTPS, DNS, TCP, ICMP and gRPC."
-                ),
-            ),
-        )
+        self.catalog_grafana_dashboard = CatalogueConsumer(charm=self, relation_name="catalogue_grafana", item=self._grafana_catalog_item)
 
     def _resource_reqs_from_config(self) -> ResourceRequirements:
         """Get the resources requirements from the Juju config."""
@@ -231,6 +207,9 @@ class BlackboxExporterCharm(CharmBase):
         # Reload or restart the service
         self.blackbox_workload.reload()
 
+        # Update catalogue items in case external URL has changed
+        self.catalog.update_item(item=self._catalogue_item)
+        self.catalog_grafana_dashboard.update_item(item=self._grafana_catalog_item)
         self.unit.status = ActiveStatus()
 
     @property
@@ -247,9 +226,33 @@ class BlackboxExporterCharm(CharmBase):
         return self.ingress.url or self._internal_url
 
     @property
+    def _catalogue_item(self) -> CatalogueItem:
+        return CatalogueItem(
+            name="Blackbox Exporter",
+            icon="box-variant",
+            url=self._external_url + "/",
+            description=(
+                "Blackbox exporter allows blackbox probing of endpoints over a multitude of "
+                "protocols, including HsTTP, HTTPS, DNS, TCP, ICMP and gRPC."
+            ),
+        )
+
+    @property
+    def _grafana_catalog_item(self) -> CatalogueItem:
+        return CatalogueItem(
+            name="Blackbox Exporter Grafana Dashboard",
+            icon="box-variant",
+            url=self._grafana_dashboard_url,
+            description=(
+                    "Blackbox exporter allows blackbox probing of endpoints over a multitude of "
+                    "protocols, including HTTP, HTTPS, DNS, TCP, ICMP and gRPC."
+            ),
+        )
+
+    @property
     def _grafana_dashboard_url(self) -> str:
         """Return the Blackbox Exporter Grafana dashboard URL."""
-        if not self.ingress.is_ready():
+        if not self.ingress.is_ready() and not self.ingress.url:
             return ""
         grafana_address = re.sub(r'blackbox[\w\-]*', 'grafana', self._external_url)
         dashboard_uid = self.model.config.get("grafana_dashboard_uid")
