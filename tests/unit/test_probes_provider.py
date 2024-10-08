@@ -7,7 +7,6 @@ from typing import List
 
 from charms.blackbox_k8s.v0.blackbox_probes import BlackboxProbesProvider
 from cosl import JujuTopology
-from helpers import patch_network_get
 from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.testing import Harness
@@ -90,7 +89,6 @@ class BlackboxProbesProviderTest(unittest.TestCase):
         self.harness.set_leader(True)
         self.harness.begin()
 
-    @patch_network_get()
     def test_provider_sets_scrape_metadata(self):
         rel_id = self.harness.add_relation(RELATION_NAME, "provider")
         self.harness.add_relation_unit(rel_id, "provider/0")
@@ -105,7 +103,6 @@ class BlackboxProbesProviderTest(unittest.TestCase):
         self.assertIn("application", scrape_metadata)
         self.assertIn("unit", scrape_metadata)
 
-    @patch_network_get()
     def test_provider_sets_probes_on_relation_joined(self):
         rel_id = self.harness.add_relation(RELATION_NAME, "provider")
         self.harness.add_relation_unit(rel_id, "provider/0")
@@ -118,7 +115,6 @@ class BlackboxProbesProviderTest(unittest.TestCase):
         self.assertEqual(scrape_data[0]["static_configs"][0]["targets"], ["10.1.238.1"])
         self.assertEqual(scrape_data[0]["params"]["module"], ["http_2xx"])
 
-    @patch_network_get()
     def test_provider_sets_modules_with_prefix_on_relation_joined(self):
         rel_id = self.harness.add_relation(RELATION_NAME, "provider")
         self.harness.add_relation_unit(rel_id, "provider/0")
@@ -135,7 +131,6 @@ class BlackboxProbesProviderTest(unittest.TestCase):
 
         self.assertIn(f"{module_name_prefix}http_2xx_longer_timeout", scrape_modules)
 
-    @patch_network_get()
     def test_provider_prefixes_jobs(self):
         rel_id = self.harness.add_relation(RELATION_NAME, "provider")
         self.harness.add_relation_unit(rel_id, "provider/0")
