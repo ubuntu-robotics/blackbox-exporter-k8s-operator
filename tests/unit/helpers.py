@@ -4,7 +4,6 @@
 
 """Helper functions for writing tests."""
 
-from typing import Callable
 from unittest.mock import patch
 
 
