@@ -10,7 +10,6 @@ from typing import cast
 from urllib.parse import urlparse
 
 import yaml
-from blackbox import ConfigUpdateFailure, WorkloadManager
 from charms.catalogue_k8s.v1.catalogue import CatalogueConsumer, CatalogueItem
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v1.loki_push_api import LogForwarder
@@ -31,6 +30,8 @@ from ops.model import (
     WaitingStatus,
 )
 from ops.pebble import PathError, ProtocolError
+
+from blackbox import ConfigUpdateFailure, WorkloadManager
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ class BlackboxExporterCharm(CharmBase):
             self,
             container_name=self._container_name,
             port=self._port,
-            web_external_url=self._external_url,
+            web_external_url="",
             config_path=self._config_path,
             log_path=self._log_path,
         )
@@ -117,7 +118,7 @@ class BlackboxExporterCharm(CharmBase):
             charm=self,
             item=CatalogueItem(
                 name="Blackbox Exporter",
-                url=self._external_url,
+                url=self._external_url + "/",
                 icon="box-variant",
                 description=(
                     "Blackbox exporter allows blackbox probing of endpoints over a multitude of "
@@ -234,7 +235,7 @@ class BlackboxExporterCharm(CharmBase):
         """The scraping jobs to execute probes from Prometheus."""
         jobs = []
         external_url = urlparse(self._external_url)
-        f"{external_url.path.rstrip('/')}/probe"
+        probes_path = f"{external_url.path.rstrip('/')}/probe"
         probes_scrape_jobs = cast(str, self.model.config.get("probes_file"))
         if probes_scrape_jobs:
             probes = yaml.safe_load(probes_scrape_jobs)
@@ -242,6 +243,7 @@ class BlackboxExporterCharm(CharmBase):
             for probe in probes["scrape_configs"]:
                 # The relabel configs come from the official Blackbox Exporter docs; please refer
                 # to that for further information on what they do
+                probe["metrics_path"] = probes_path
                 probe["relabel_configs"] = [
                     {"source_labels": ["__address__"], "target_label": "__param_target"},
                     {"source_labels": ["__param_target"], "target_label": "instance"},
@@ -250,7 +252,7 @@ class BlackboxExporterCharm(CharmBase):
                     # Set the address to scrape to the blackbox exporter url
                     {
                         "target_label": "__address__",
-                        "replacement": self._external_url.replace("http://", ""),
+                        "replacement": f"{external_url.hostname}",
                     },
                 ]
                 jobs.append(probe)
