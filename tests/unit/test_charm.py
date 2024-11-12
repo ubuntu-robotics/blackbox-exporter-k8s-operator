@@ -67,6 +67,7 @@ class TestWithInitialHooks(unittest.TestCase):
         self.assertIsInstance(self.harness.charm.unit.status, ActiveStatus)
 
 
+
 class TestWithoutInitialHooks(unittest.TestCase):
     container_name: str = "blackbox"
 

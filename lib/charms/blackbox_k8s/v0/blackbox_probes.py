@@ -1,18 +1,18 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Blackbox Probes Library.
+"""Blackbox Exporter Probes Library.
 
 ## Overview
 
-This document explains how to integrate with the Blackbox charm
+This document explains how to integrate with the Blackbox Exporter charm
 for the purpose of providing a probes metrics endpoint to Prometheus.
 
 ## Provider Library Usage
 
 The Blackbox Exporter charm interacts with its datasources using this charm
-library. The goal of this library is to be as simple to use as possible.
-Charms seeking to expose metric endpoints to be probed via Blackbox, must do so
+library.
+Charms seeking to expose probes for Blackbox, must do so
 using the `BlackboxProbesProvider` object from this charm library.
 For the simplest use cases, the BlackboxProbesProvider object requires
 to be instantiated with a list of jobs with the endpoints to monitor.
@@ -21,27 +21,35 @@ are then organised in a prometheus job for proper scraping.
 The `BlackboxProbesProvider` constructor requires
 the name of the relation over which a probe target
 is exposed to the Blakcbox Exporter charm. This relation must use the
-`blackbox_probes` interface.
+`blackbox_exporter_probes` interface.
 The default name for the metrics endpoint relation is
 `blackbox-targets`. It is strongly recommended to use the same
 relation name for consistency across charms and doing so obviates the
 need for an additional constructor argument. The
-`BlackboxProbesProvider` object may be instantiated as follows
+`BlackboxProbesProvider` object may be instantiated as follows:
 
     from charms.blackbox_k8s.v0.blackbox_probes import BlackboxProbesProvider
 
     def __init__(self, *args):
         super().__init__(*args)
         ...
-        self.probes_provider = BlackboxProbesProvider(self, probes=probes_endpoints_config)
+        self.probes_provider = BlackboxProbesProvider(
+            self,
+            probes=[{
+                'params': {'module': ['http_2xx']},
+                'static_configs': [
+                    {'targets': ['http://endpoint.com']}
+                ]
+            }]
+        )
         ...
 
 Note that the first argument (`self`) to `BlackboxProbesProvider` is
 always a reference to the parent charm.
 
-An instantiated `BlackboxProbesProvider` object will ensure that
-the list of endpoints to be probed are passed through to Blackbox Exporter,
-which will format them to be scraped for Prometheus.
+A `BlackboxProbesProvider` object will ensure that
+the list of probes are provided to Blackbox which will ,
+which will export them to Prometheus for scraping.
 The list of probes is provided via the constructor argument `probes`.
 The probes argument represents a necessary subset (module and static_configs) of a
 Prometheus scrape job using Python standard data structures.
@@ -147,9 +155,9 @@ purposes a Blackbox Exporter charm needs to do two things:
 1. Instantiate the `BlackboxProbesRequirer` object by providing it a
 reference to the parent (Blackbox Exporter) charm and, optionally, the name of
 the relation that the Blackbox Exporter charm uses to interact with probes
-targets. This relation must confirm to the `blackbox_probes`
+targets. This relation must confirm to the `blackbox_exporter_probes`
 interface and it is strongly recommended that this relation be named
-`blackbox-probes` which is its default value.
+`probes` which is its default value.
 
 For example a Blackbox Exporter may instantiate the
 `BlackboxProbesRequirer` in its constructor as follows
@@ -161,7 +169,7 @@ For example a Blackbox Exporter may instantiate the
         ...
         self.probes_consumer = BlackboxProbesRequirer(
             charm=self,
-            relation_name="blackbox-probes",
+            relation_name="probes",
         )
         ...
 
@@ -223,7 +231,7 @@ PYDEPS = ["pydantic"]
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_RELATION_NAME = "blackbox-probes"
+DEFAULT_RELATION_NAME = "probes"
 
 class DataValidationError(Exception):
     """Raised when data validation fails on IPU relation data."""
@@ -392,40 +400,15 @@ class BlackboxProbesProvider(Object):
         super().__init__(charm, relation_name)
         """Construct a Blackbox Exporter client.
 
-        To integrate with Blackbox Exporter, a charm should instantiate a
-        `BlackboxProbesProvider` as follows:
-
-            self.blackbox_probes = BlackboxProbesProvider(
-                self,
-                probes = [
-                    ""
-                      params:
-                        module: [http_2xx]
-                      static_configs:
-                        - targets: 
-                            - http://target-a
-                            labels: 
-                                name: "device"
-                    "",
-                    ""
-                      params:
-                        module: [http_2xx_longer_timeout]
-                      static_configs:
-                        - targets: ['http://target-b' 'http://target-c']
-                    ""
-                ],
-                modules={
-                    "http_2xx_longer_timeout": {
-                        "prober": "http"
-                        "timeout": "30s"  # default is 5s
-                    }
-                },
-                refresh_event=[
-                    self.on.update_status,
-                    self.ingress.on.ready_for_unit,
-                ],
-                relation_name="blackbox-probes",
-            )
+        Charms seeking to expose metric endpoints to be probed via Blackbox, must do so
+        using the `BlackboxProbesProvider` object from this charm library.
+        For the simplest use cases, the BlackboxProbesProvider object requires
+        to be instantiated with a list of jobs with the endpoints to monitor.
+        A probe in blackbox is defined by a module and a static_config target. Those
+        are then organised in a prometheus job for proper scraping.
+        The `BlackboxProbesProvider` constructor requires
+        the name of the relation over which a probe target
+        is exposed to the Blakcbox Exporter charm.
 
         Args:
             charm: a `CharmBase` object which manages the
@@ -450,26 +433,25 @@ class BlackboxProbesProvider(Object):
         self._modules = {} if modules is None else modules
 
         events = self._charm.on[self._relation_name]
-        self.framework.observe(events.relation_changed, self.set_probes_spec)
+        self.framework.observe(events.relation_changed, self._set_probes_spec)
 
+        refresh_event = []
         if not refresh_event:
             if len(self._charm.meta.containers) == 1:
                 container = list(self._charm.meta.containers.values())[0]
                 refresh_event = [self._charm.on[container.name.replace("-", "_")].pebble_ready]
-            else:
-                refresh_event = []
         elif not isinstance(refresh_event, list):
             refresh_event = [refresh_event]
 
-        module_name_prefix = "juju_{}_".format(self.topology.identifier)
+        module_name_prefix = f"juju_{self.topology.identifier}_"
         self._prefix_probes(module_name_prefix)
         self._prefix_modules(module_name_prefix)
 
-        self.framework.observe(events.relation_joined, self.set_probes_spec)
+        self.framework.observe(events.relation_joined, self._set_probes_spec)
         for ev in refresh_event:
-            self.framework.observe(ev, self.set_probes_spec)
+            self.framework.observe(ev, self._set_probes_spec)
 
-    def set_probes_spec(self, _=None):
+    def _set_probes_spec(self, _=None):
         """Ensure probes target information is made available to Blackbox Exporter.
 
         When a probes provider charm is related to a blackbox exporter charm, the
@@ -558,7 +540,7 @@ class BlackboxProbesRequirer(Object):
             charm: a `CharmBase` instance that manages this
                 instance of the Blackbox Exporter service.
             relation_name: an optional string name of the relation between `charm`
-                and the Blackbox Exporter charmed service. The default is "blackbox-probes".
+                and the Blackbox Exporter charmed service. The default is "probes".
 
         Raises:
             RelationNotFoundError: If there is no relation in the charm's metadata.yaml

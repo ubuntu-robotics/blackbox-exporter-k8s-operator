@@ -11,7 +11,7 @@ from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.testing import Harness
 
-RELATION_NAME = "blackbox-probes"
+RELATION_NAME = "probes"
 
 PROVIDER_META = f"""
 name: provider-tester
@@ -19,7 +19,7 @@ containers:
   blackbox-tester:
 provides:
   {RELATION_NAME}:
-    interface: blackbox_probes
+    interface: blackbox_exporter_probes
 """
 
 
@@ -93,7 +93,7 @@ class BlackboxProbesProviderTest(unittest.TestCase):
         rel_id = self.harness.add_relation(RELATION_NAME, "provider")
         self.harness.add_relation_unit(rel_id, "provider/0")
 
-        self.harness.charm.provider.set_probes_spec()
+        self.harness.charm.provider._set_probes_spec()
 
         data = self.harness.get_relation_data(rel_id, self.harness.model.app.name)
         self.assertIn("scrape_metadata", data)
@@ -107,7 +107,7 @@ class BlackboxProbesProviderTest(unittest.TestCase):
         rel_id = self.harness.add_relation(RELATION_NAME, "provider")
         self.harness.add_relation_unit(rel_id, "provider/0")
 
-        self.harness.charm.provider.set_probes_spec()
+        self.harness.charm.provider._set_probes_spec()
 
         data = self.harness.get_relation_data(rel_id, self.harness.model.app.name)
         self.assertIn("scrape_probes", data)
@@ -119,7 +119,7 @@ class BlackboxProbesProviderTest(unittest.TestCase):
         rel_id = self.harness.add_relation(RELATION_NAME, "provider")
         self.harness.add_relation_unit(rel_id, "provider/0")
 
-        self.harness.charm.provider.set_probes_spec()
+        self.harness.charm.provider._set_probes_spec()
 
         data = self.harness.get_relation_data(rel_id, self.harness.model.app.name)
         self.assertIn("scrape_modules", data)
@@ -135,7 +135,7 @@ class BlackboxProbesProviderTest(unittest.TestCase):
         rel_id = self.harness.add_relation(RELATION_NAME, "provider")
         self.harness.add_relation_unit(rel_id, "provider/0")
 
-        self.harness.charm.provider.set_probes_spec()
+        self.harness.charm.provider._set_probes_spec()
 
         data = self.harness.get_relation_data(rel_id, self.harness.model.app.name)
         scrape_data = json.loads(data["scrape_probes"])
@@ -172,5 +172,5 @@ class BlackboxProbesWrongProviderTest(unittest.TestCase):
         self.assertEqual(self.harness.charm._stored.num_events, 0)
         rel_id = self.harness.add_relation(RELATION_NAME, "provider")
         self.harness.add_relation_unit(rel_id, "provider/0")
-        self.harness.charm.provider.set_probes_spec()
+        self.harness.charm.provider._set_probes_spec()
         self.assertEqual(self.harness.charm._stored.num_events, 2)
