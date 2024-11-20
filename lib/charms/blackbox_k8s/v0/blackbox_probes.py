@@ -218,7 +218,7 @@ import pydantic
 from pydantic import BaseModel, ConfigDict, Field, Json
 
 # The unique Charmhub library identifier, never change it
-LIBID = "1"
+LIBID = "857fd3ed0a414dc5a141b7d6818a883d"
 
 # Increment this major API version when introducing breaking changes
 LIBAPI = 0
