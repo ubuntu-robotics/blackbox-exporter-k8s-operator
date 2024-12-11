@@ -89,7 +89,7 @@ overridden by the charm with the needed labels and the correct Blackbox Exporter
 #### Dynamic Configuration
 
 The list of probes and the list of modules for probing can also be changed dynamically from other charms.
-The charm offers a relation to allow charms to dynamically export endpoints to be probed via Blackbox Exporter and custom modules for probing. Those are exported over the probes relation using the blackbox_exporter_probes interface:
+The charm offers a relation to allow charms to forward custom probe spec to Blackbox Exporter. Those are exported over the probes relation using the blackbox_exporter_probes interface:
 
 ```shell
 requires:
@@ -97,14 +97,14 @@ requires:
     interface: blackbox_exporter_probes
 ```
 
-The probes provided dynamically by a charm are merged with the probes defined in a configuration file, same with the modules which are integrated in the blackbox-config file.
+The cusrom probes provided via relation data are merged with the probes defined in a configuration file, same with the modules which are integrated in the blackbox-config file.
 In order for the charm defined probes to be probed via this charm all that is required is to relate the two charms with:
 
 ```shell
 juju relate <charm> blackbox:probes
 ```
 
-Charms that seek to provide probes for Blackbox Exporter, must do so using the provided blackbox_exporter_probes charm library. This library ensures that probes and modules defined by a charm are forwarded correctly to Prometheus, and the metrics displayed in the associated Grafana Dashboard.
+Charms that seek to provide probes for Blackbox Exporter, can do so using the provided blackbox_exporter_probes charm library. This library ensures that probes and modules defined by a charm are forwarded correctly to Prometheus, and the metrics displayed in the associated Grafana Dashboard.
 
 ## OCI Images
 This charm is published on Charmhub with blackbox exporter images from

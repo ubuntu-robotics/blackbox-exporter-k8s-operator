@@ -9,6 +9,10 @@ from charms.blackbox_k8s.v0.blackbox_probes import BlackboxProbesProvider
 from cosl import JujuTopology
 from ops.charm import CharmBase
 from ops.framework import StoredState
+from ops.model import (
+    ActiveStatus,
+    BlockedStatus,
+)
 from ops.testing import Harness
 
 RELATION_NAME = "probes"
@@ -73,8 +77,6 @@ MODULES: dict = {
 
 
 class BlackboxProbesProviderCharmWithModules(CharmBase):
-    _stored = StoredState()
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args)
 
@@ -118,12 +120,10 @@ class BlackboxProbesProviderTest(unittest.TestCase):
     def test_provider_sets_modules_with_prefix_on_relation_joined(self):
         rel_id = self.harness.add_relation(RELATION_NAME, "provider")
         self.harness.add_relation_unit(rel_id, "provider/0")
-
         self.harness.charm.provider._set_probes_spec()
 
         data = self.harness.get_relation_data(rel_id, self.harness.model.app.name)
         self.assertIn("scrape_modules", data)
-
         scrape_modules = json.loads(data["scrape_modules"])
 
         topology = JujuTopology.from_dict(json.loads(data["scrape_metadata"]))
@@ -144,6 +144,14 @@ class BlackboxProbesProviderTest(unittest.TestCase):
 
         self.assertEqual(scrape_data[0]["job_name"], f"{module_name_prefix}my-first-job")
 
+    def test_get_active_status(self):
+        self.addCleanup(self.harness.cleanup)
+        rel_id = self.harness.add_relation(RELATION_NAME, "provider")
+        self.harness.add_relation_unit(rel_id, "provider/0")
+        self.harness.charm.provider._set_probes_spec()
+        status = self.harness.charm.provider.get_status()
+        assert status == ActiveStatus()
+
 
 class BlackboxProbesProviderCharmWithWrongProbe(CharmBase):
     _stored = StoredState()
@@ -154,10 +162,6 @@ class BlackboxProbesProviderCharmWithWrongProbe(CharmBase):
         self.provider = BlackboxProbesProvider(
             self, probes=PROBES_NOT_VALID_MISSING_MODULE, modules=MODULES
         )
-        self.framework.observe(self.provider.on.invalid_probe, self.record_events)
-
-    def record_events(self, event):
-        self._stored.num_events += 1
 
 
 class BlackboxProbesWrongProviderTest(unittest.TestCase):
@@ -168,9 +172,10 @@ class BlackboxProbesWrongProviderTest(unittest.TestCase):
         self.harness.set_leader(True)
         self.harness.begin()
 
-    def test_provider_notifies_on_invalid_probe(self):
+    def test_get_blocked_status_on_invalid_probe(self):
         self.assertEqual(self.harness.charm._stored.num_events, 0)
         rel_id = self.harness.add_relation(RELATION_NAME, "provider")
         self.harness.add_relation_unit(rel_id, "provider/0")
         self.harness.charm.provider._set_probes_spec()
-        self.assertEqual(self.harness.charm._stored.num_events, 2)
+        status = self.harness.charm.provider.get_status()
+        assert status == BlockedStatus("Errors occurred in probe configuration")

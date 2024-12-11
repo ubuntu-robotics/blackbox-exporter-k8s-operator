@@ -6,11 +6,11 @@
 
 import logging
 import socket
-from typing import List, cast
+from typing import cast
 from urllib.parse import urlparse
 
 import yaml
-from charms.blackbox_k8s.v0.blackbox_probes import BlackboxProbesRequirer, ProbesJobModel
+from charms.blackbox_k8s.v0.blackbox_probes import BlackboxProbesRequirer
 from charms.catalogue_k8s.v1.catalogue import CatalogueConsumer, CatalogueItem
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v1.loki_push_api import LogForwarder
@@ -33,6 +33,7 @@ from ops.model import (
 from ops.pebble import PathError, ProtocolError
 
 from blackbox import ConfigUpdateFailure, WorkloadManager
+from scrape_config_builder import ScrapeConfigBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -278,67 +279,19 @@ class BlackboxExporterCharm(CharmBase):
         self.container.push(self._config_path, updated_config_data)
         self.blackbox_workload.reload()
 
-    def _merge_scrape_configs(
-        self, file_probes: dict, relation_probes: List[ProbesJobModel]
-    ) -> List[dict]:
-        """Merge the scrape_configs from both file and relation.
-
-        Args:
-            file_probes: data parsed from the "probes_file" configuration, loaded as a dictionary.
-                Defaults to an empty dictionary if no valid YAML or config entry is found.
-            relation_probes: a list of dicts probes extracted from a relation.
-
-        Returns:
-            A list of dicts representing the merged probes from both file and relation data.
-        """
-        merged_scrape_configs = {
-            probe["job_name"]: probe for probe in file_probes.get("scrape_configs", [])
-        }
-
-        for probe in relation_probes:
-            ## convert probes from pydantic type to dict
-            if not isinstance(probe, dict):
-                probe = dict(probe)
-            job_name = probe["job_name"]
-            merged_scrape_configs[job_name] = probe
-        return list(merged_scrape_configs.values())
-
     @property
     def probes_scraping_jobs(self):
         """The scraping jobs to execute probes from Prometheus."""
-        jobs = []
-        external_url = urlparse(self._external_url)
-        probes_path = f"{external_url.path.rstrip('/')}/probe"
-
-        # get probes from file and relation
+        # Extract file and relation probes
         file_probes_scrape_jobs = cast(str, self.model.config.get("probes_file"))
         relation_probes_scrape_jobs = self._probes_requirer.probes()
-        # load relation and file probes as yaml if they exist and merge them
-        file_probes_scrape_jobs = (
-            yaml.safe_load(file_probes_scrape_jobs) if file_probes_scrape_jobs else {}
-        )
-        merged_scrape_configs = self._merge_scrape_configs(
-            file_probes_scrape_jobs, relation_probes_scrape_jobs
+
+        builder = ScrapeConfigBuilder(self._external_url)
+        jobs = builder.build_probes_scraping_jobs(
+            file_probes=file_probes_scrape_jobs,
+            relation_probes=relation_probes_scrape_jobs,
         )
 
-        # Add the Blackbox Exporter's `relabel_configs` to each job
-        for probe in merged_scrape_configs:
-            external_url = urlparse(self._external_url)
-            probe["metrics_path"] = probes_path
-            # The relabel configs come from the official Blackbox Exporter docs; please refer
-            # to that for further information on what they do
-            probe["relabel_configs"] = [
-                {"source_labels": ["__address__"], "target_label": "__param_target"},
-                {"source_labels": ["__param_target"], "target_label": "instance"},
-                # Copy the scrape job target to an extra label for dashboard usage
-                {"source_labels": ["__param_target"], "target_label": "probe_target"},
-                # Set the address to scrape to the blackbox exporter url
-                {
-                    "target_label": "__address__",
-                    "replacement": f"{external_url.hostname}",
-                },
-            ]
-            jobs.append(probe)
         return jobs
 
     def _on_pebble_ready(self, _):
