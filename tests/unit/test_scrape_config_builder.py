@@ -24,9 +24,7 @@ class TestScrapeConfigBuilder(unittest.TestCase):
 
     def test_merge_scrape_configs(self):
         """Test that file and relation probes are merged correctly."""
-        merged = self.builder.merge_scrape_configs(
-            self.file_probes, self.relation_probes
-        )
+        merged = self.builder.merge_scrape_configs(self.file_probes, self.relation_probes)
 
         self.assertEqual(len(merged), 2)
         self.assertIn("config_yaml_job", [job["job_name"] for job in merged])
