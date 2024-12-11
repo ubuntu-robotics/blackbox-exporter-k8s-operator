@@ -133,3 +133,10 @@ class BlackboxProbesRequirerTest(unittest.TestCase):
         probes = self.harness.charm.probes_requirer.probes()
         self.assertEqual(len(probes), 2)
         self.assertEqual(type(probes), list)
+
+    def test_requirer_returns_all_modules(self):
+        self.setup_charm_relations()
+
+        modules = self.harness.charm.probes_requirer.modules()
+        self.assertEqual(len(modules), 1)
+        self.assertEqual(type(modules), dict)

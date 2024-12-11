@@ -105,7 +105,7 @@ each job must be given a unique name:
 ```
 [
     {
-        "job_name": "blackbox-http-2xx",
+        "job_name": "blackbox-icmp-job",
         'params': {
             'module': ['http_2xx']
         },
@@ -117,7 +117,7 @@ each job must be given a unique name:
         ]
     },
     {
-        "job_name": "blackbox-icmp-job",
+        "job_name": "blackbox-http-2xx",
         'params': {
             'module': ['icmp']
         },
@@ -387,15 +387,9 @@ class InvalidProbeEvent(EventBase):
         self.errors = snapshot["errors"]
 
 
-class BlackboxProbesProviderEvents(ObjectEvents):
-    """Events raised by :class:`InvalidProbeEvent`s."""
-
-    invalid_probe = EventSource(InvalidProbeEvent)
-
 class BlackboxProbesProvider(Object):
     """A provider object for Blackbox Exporter probes."""
 
-    on = BlackboxProbesProviderEvents() # pyright: ignore
     _stored = StoredState()
 
     def __init__(
@@ -479,7 +473,7 @@ class BlackboxProbesProvider(Object):
         """
         if not self._charm.unit.is_leader():
             return
-        
+
         errors = []
         for relation in self._charm.model.relations[self._relation_name]:
             try:
@@ -495,10 +489,9 @@ class BlackboxProbesProvider(Object):
                     if msg.startswith(
                         b"ERROR cannot read relation application settings: permission denied"
                     ):
-                        logger.error(
-                            f"encountered error {e} while attempting to update_relation_data."
+                        error_message = f"encountered error {e} while attempting to update_relation_data." \
                             f"The relation must be gone."
-                        )
+                        errors.append(error_message)
                         continue
                 raise
             except pydantic.ValidationError as e:
@@ -602,8 +595,10 @@ class BlackboxProbesRequirer(Object):
         super().__init__(charm, relation_name)
         self._stored.set_default(
             scrape_probes=[],
+            blackbox_scrape_modules={},
             errors=[],
-            needs_update=True,
+            probes_need_update=True,
+            modules_need_update=True,
         )
         self._charm = charm
         self._relation_name = relation_name
@@ -626,7 +621,8 @@ class BlackboxProbesRequirer(Object):
                 charm must update its scrape configuration.
         """
         rel_id = event.relation.id
-        self._stored.needs_update = True
+        self._stored.probes_need_update = True
+        self._stored.modules_need_update = True
         self.on.targets_changed.emit(relation_id=rel_id)
 
     def _on_probes_provider_relation_departed(self, event):
@@ -642,7 +638,8 @@ class BlackboxProbesRequirer(Object):
                unit has departed.
         """
         rel_id = event.relation.id
-        self._stored.needs_update = True
+        self._stored.probes_need_update = True
+        self._stored.modules_need_update = True
         self.on.targets_changed.emit(relation_id=rel_id)
 
     def get_status(self) -> StatusBase:
@@ -674,31 +671,56 @@ class BlackboxProbesRequirer(Object):
                 databag = ApplicationDataModel.load(relation.data[relation.app])
                 scrape_probes.extend([probe.model_dump() for probe in databag.scrape_probes])
             except (json.JSONDecodeError, pydantic.ValidationError, DataValidationError) as e:
-                logger.error("Invalid probes provided")
                 error_message = f"Invalid probes provided in relation {relation.id}: {e}"
                 errors.append(error_message)
 
         self._stored.scrape_probes = scrape_probes
         self._stored.errors = errors
-        self._stored.needs_update = False
+        self._stored.probes_need_update = False
 
         return scrape_probes
 
     def probes(self) -> list:
-        """Fetch the dict of probes to scrape, if they need update
+        """Fetch the list of probes to scrape, if they need update
 
         Returns:
-            A dict consisting of all the static probes configurations
+            A list consisting of all the static probes configurations
             for each related `BlackboxExporterProvider'.
         """
 
-        if self._stored.needs_update:
+        if self._stored.probes_need_update:
             self._update_probes()
 
         probes = [] + _type_convert_stored(
             self._stored.scrape_probes  # pyright: ignore
         )
         return probes
+
+    def _update_modules(self) -> dict:
+        """Fetch the dict of blackbox modules to configure.
+
+        Returns:
+            A dict consisting of all the modueles configurations
+            for each related `BlackboxExporterProvider`.
+        """
+        blackbox_scrape_modules = {}
+        errors = []
+
+        for relation in self._charm.model.relations[self._relation_name]:
+            try:
+                if not relation.data[relation.app]:
+                    continue
+                databag = ApplicationDataModel.load(relation.data[relation.app])
+                blackbox_scrape_modules.update(databag.scrape_modules)
+            except (json.JSONDecodeError, pydantic.ValidationError, DataValidationError) as e:
+                error_message = f"Invalid blackbox module provided in relation {relation.id}: {e}"
+                errors.append(error_message)
+
+        self._stored.blackbox_scrape_modules = blackbox_scrape_modules
+        self._stored.errors = errors
+        self._stored.modules_need_update = False
+
+        return blackbox_scrape_modules
 
     def modules(self) -> dict:
         """Fetch the dict of blackbox modules to configure.
@@ -707,15 +729,11 @@ class BlackboxProbesRequirer(Object):
             A dict consisting of all the modueles configurations
             for each related `BlackboxExporterProvider`.
         """
-        blackbox_scrape_modules = {}
 
-        for relation in self._charm.model.relations[self._relation_name]:
-            try:
-                if not relation.data[relation.app]:
-                    continue
-                databag = ApplicationDataModel.load(relation.data[relation.app])
-                blackbox_scrape_modules.update(databag.scrape_modules)
-            except (json.JSONDecodeError, pydantic.ValidationError, DataValidationError):
-                logger.error("Invalid blackbox module provided provided")
+        if self._stored.modules_need_update:
+            self._update_modules()
 
-        return blackbox_scrape_modules
+        modules = {}
+        modules.update(_type_convert_stored(self._stored.blackbox_scrape_modules))
+
+        return modules

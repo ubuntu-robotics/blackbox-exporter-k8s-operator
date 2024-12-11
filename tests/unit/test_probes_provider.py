@@ -144,6 +144,20 @@ class BlackboxProbesProviderTest(unittest.TestCase):
 
         self.assertEqual(scrape_data[0]["job_name"], f"{module_name_prefix}my-first-job")
 
+    def test_provider_prefixes_modules(self):
+        rel_id = self.harness.add_relation(RELATION_NAME, "provider")
+        self.harness.add_relation_unit(rel_id, "provider/0")
+
+        self.harness.charm.provider._set_probes_spec()
+
+        data = self.harness.get_relation_data(rel_id, self.harness.model.app.name)
+        scrape_data = json.loads(data["scrape_modules"])
+        topology = JujuTopology.from_dict(json.loads(data["scrape_metadata"]))
+        module_name_prefix = "juju_{}_".format(topology.identifier)
+        actual_key = next(iter(scrape_data.keys()))
+        expected_key = f"{module_name_prefix}http_2xx_longer_timeout"
+        self.assertEqual(actual_key, expected_key)
+
     def test_get_active_status(self):
         self.addCleanup(self.harness.cleanup)
         rel_id = self.harness.add_relation(RELATION_NAME, "provider")
