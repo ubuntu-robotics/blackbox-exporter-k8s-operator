@@ -58,6 +58,51 @@ SCRAPE_METADATA = {
     "unit": "test-unit",
 }
 
+PROBES_WITH_SAME_NAME: List[dict] = [
+    {
+        "job_name": "my-first-job",
+        "params": {"module": ["http_2xx"]},
+        "static_configs": [
+            {
+                "targets": ["10.1.238.1"],
+                "labels": {"some_key": "some-value"},
+            }
+        ],
+    },
+    {
+        "job_name": "my-first-job",
+        "params": {
+            "module": ["icmp"],
+        },
+        "static_configs": [
+            {"targets": ["10.1.238.1"], "labels": {"some_other_key": "some-other-value"}}
+        ],
+    },
+]
+
+IDENTICAL_PROBES: List[dict] = [
+    {
+        "job_name": "my-first-job",
+        "params": {"module": ["http_2xx"]},
+        "static_configs": [
+            {
+                "targets": ["10.1.238.1"],
+                "labels": {"some_key": "some-value"},
+            }
+        ],
+    },
+    {
+        "job_name": "my-first-job",
+        "params": {"module": ["http_2xx"]},
+        "static_configs": [
+            {
+                "targets": ["10.1.238.1"],
+                "labels": {"some_key": "some-value"},
+            }
+        ],
+    },
+]
+
 
 class BlackboxProbesRequirerCharm(CharmBase):
     _stored = StoredState()
@@ -140,3 +185,51 @@ class BlackboxProbesRequirerTest(unittest.TestCase):
         modules = self.harness.charm.probes_requirer.modules()
         self.assertEqual(len(modules), 1)
         self.assertEqual(type(modules), dict)
+
+    def setup_charm_relations_same_name(self):
+        """Create relations used by test cases."""
+        rel_ids = []
+        self.assertEqual(self.harness.charm._stored.num_events, 0)
+        rel_id = self.harness.add_relation(RELATION_NAME, "requirer")
+        rel_ids.append(rel_id)
+        self.harness.update_relation_data(
+            rel_id,
+            "requirer",
+            {
+                "scrape_metadata": json.dumps(SCRAPE_METADATA),
+                "scrape_probes": json.dumps(PROBES_WITH_SAME_NAME),
+                "scrape_modules": json.dumps(MODULES),
+            },
+        )
+        self.assertEqual(self.harness.charm._stored.num_events, 1)
+
+    def test_requirer_returns_all_probes_targets_hashed(self):
+        self.setup_charm_relations_same_name()
+
+        probes = self.harness.charm.probes_requirer.probes()
+        self.assertEqual(len(probes), 2)
+        self.assertEqual(type(probes), list)
+
+    def setup_charm_relations_identical(self):
+        """Create relations used by test cases."""
+        rel_ids = []
+        self.assertEqual(self.harness.charm._stored.num_events, 0)
+        rel_id = self.harness.add_relation(RELATION_NAME, "requirer")
+        rel_ids.append(rel_id)
+        self.harness.update_relation_data(
+            rel_id,
+            "requirer",
+            {
+                "scrape_metadata": json.dumps(SCRAPE_METADATA),
+                "scrape_probes": json.dumps(IDENTICAL_PROBES),
+                "scrape_modules": json.dumps(MODULES),
+            },
+        )
+        self.assertEqual(self.harness.charm._stored.num_events, 1)
+
+    def test_requirer_discard_identical_probes(self):
+        self.setup_charm_relations_identical()
+
+        probes = self.harness.charm.probes_requirer.probes()
+        self.assertEqual(len(probes), 1)
+        self.assertEqual(type(probes), list)

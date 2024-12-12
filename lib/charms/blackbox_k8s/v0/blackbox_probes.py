@@ -200,6 +200,7 @@ Blackbox configuration file.
 import logging
 import json
 import copy
+import hashlib
 from typing import Dict, List, Optional, Union, MutableMapping
 
 from ops import Object
@@ -501,7 +502,7 @@ class BlackboxProbesProvider(Object):
 
         self._stored.errors = errors
 
-    def _prefix_probes(self, prefix: str):
+    def _prefix_probes(self, prefix: str) -> None:
         """Prefix the probes job_names and the probe_modules with the charm metadata.
 
         The probe module will be prefixed only if it is a custom module defined by the
@@ -516,7 +517,7 @@ class BlackboxProbesProvider(Object):
             for module in probe_module:
                 if module in self._modules:
                     prefixed_module_value = f"{prefix}_{module}"
-                    probe['params']['module'] = prefixed_module_value
+                    probe['params']['module'].append(prefixed_module_value)
 
     def _prefix_modules(self, prefix: str) -> None:
         """Prefix the modules with the charm metadata."""
@@ -575,6 +576,7 @@ def _type_convert_stored(obj):
             rdict[k] = _type_convert_stored(obj[k])
         return rdict
     return obj
+
 
 class BlackboxProbesRequirer(Object):
     """A requirer object for Blackbox Exporter probes."""
@@ -659,6 +661,25 @@ class BlackboxProbesRequirer(Object):
             return WaitingStatus("Probes are being updated, please wait.")
         return ActiveStatus()
 
+    def _process_and_hash_probes(self, databag):
+        """Extend and hash probes in one pass to make them unique."""
+        scrape_probes_hashed = []
+        unique_hashes = set()
+        for probe in databag.scrape_probes:
+            probe_data = probe.model_dump()
+
+            probe_str = str(probe_data)
+            probe_hash = hashlib.sha256(probe_str.encode()).hexdigest()
+
+            job_name = probe_data.get("job_name", "")
+            probe_data["job_name"] = f"{job_name}_{probe_hash}"
+
+            if probe_hash not in unique_hashes:
+                scrape_probes_hashed.append(probe_data)
+                unique_hashes.add(probe_hash)
+
+        return scrape_probes_hashed
+
     def _update_probes(self):
         """Update the cache of probes and errors by iterating over relation data."""
         scrape_probes = []
@@ -669,7 +690,7 @@ class BlackboxProbesRequirer(Object):
                 if not relation.data[relation.app]:
                     continue
                 databag = ApplicationDataModel.load(relation.data[relation.app])
-                scrape_probes.extend([probe.model_dump() for probe in databag.scrape_probes])
+                scrape_probes = self._process_and_hash_probes(databag)
             except (json.JSONDecodeError, pydantic.ValidationError, DataValidationError) as e:
                 error_message = f"Invalid probes provided in relation {relation.id}: {e}"
                 errors.append(error_message)
@@ -711,7 +732,7 @@ class BlackboxProbesRequirer(Object):
                 if not relation.data[relation.app]:
                     continue
                 databag = ApplicationDataModel.load(relation.data[relation.app])
-                blackbox_scrape_modules.update(databag.scrape_modules)
+                blackbox_scrape_modules = databag.dict(exclude_unset=True)["scrape_modules"]
             except (json.JSONDecodeError, pydantic.ValidationError, DataValidationError) as e:
                 error_message = f"Invalid blackbox module provided in relation {relation.id}: {e}"
                 errors.append(error_message)

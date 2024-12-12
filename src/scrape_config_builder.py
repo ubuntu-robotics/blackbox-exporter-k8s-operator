@@ -28,7 +28,8 @@ class ScrapeConfigBuilder:
         Args:
             file_probes: data parsed from the "probes_file" configuration, loaded as a dictionary.
                 Defaults to an empty dictionary if no valid YAML or config entry is found.
-            relation_probes: a list of dicts probes extracted from a relation.
+            relation_probes: a list of dicts probes extracted from a relation. Relation probes job_names
+                are hashed to ensure uniqueness and avoid conflict.
 
         Returns:
             A list of dicts representing the merged probes from both file and relation data.
