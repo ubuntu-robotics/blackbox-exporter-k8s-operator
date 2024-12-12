@@ -456,7 +456,6 @@ class BlackboxProbesProvider(Object):
         refresh_event.append(self._charm.on.leader_elected)
 
         module_name_prefix = f"juju_{self.topology.identifier}"
-        # we should deduplicate (or discard?) incoming probes/modules with the same job_name
         self._prefix_probes(module_name_prefix)
         self._prefix_modules(module_name_prefix)
 
