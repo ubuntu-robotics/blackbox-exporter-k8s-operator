@@ -21,7 +21,7 @@ variable "config" {
 variable "constraints" {
   description = "String listing constraints for the application"
   type        = string
-  default     = "arch=amd64"
+  default     = ""
 }
 
 variable "model" {
