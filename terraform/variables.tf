@@ -7,6 +7,7 @@ variable "app_name" {
 variable "channel" {
   description = "Channel that the charm is deployed from"
   type        = string
+  default     = "1/stable"
 }
 
 variable "config" {
@@ -18,11 +19,9 @@ variable "config" {
 # We use constraints to set AntiAffinity in K8s
 # https://discourse.charmhub.io/t/pod-priority-and-affinity-in-juju-charms/4091/13?u=jose
 variable "constraints" {
-  description = "String listing constraints for this application"
+  description = "String listing constraints for the application"
   type        = string
-  # FIXME: Passing an empty constraints value to the Juju Terraform provider currently
-  # causes the operation to fail due to https://github.com/juju/terraform-provider-juju/issues/344
-  default = "arch=amd64"
+  default     = "arch=amd64"
 }
 
 variable "model_uuid" {
@@ -30,17 +29,19 @@ variable "model_uuid" {
   type        = string
 }
 
+variable "resources" {
+  description = "Resources used by the charm"
+  type        = map(string)
+  default = {
+    blackbox-exporter-image : "ubuntu/blackbox-exporter:0.26-24.04"
+  }
+}
+
 variable "revision" {
   description = "Revision number of the charm"
   type        = number
   nullable    = true
   default     = null
-}
-
-variable "storage_directives" {
-  description = "Map of storage used by the application, which defaults to 1 GB, allocated by Juju"
-  type        = map(string)
-  default     = {}
 }
 
 variable "units" {
