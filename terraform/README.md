@@ -78,7 +78,7 @@ module "blackbox_exporter" {
 
 # To integrate with Prometheus
 resource "juju_integration" "blackbox_prometheus" {
-  model = data.juju_model.my_model.name
+  model_uuid = data.juju_model.my_model.uuid
 
   application {
     name     = module.blackbox_exporter.app_name
